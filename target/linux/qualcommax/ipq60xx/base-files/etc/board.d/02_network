@@ -30,7 +30,10 @@ ipq60xx_setup_interfaces()
 	netgear,wax214)
 		ucidef_set_interfaces_lan_wan "lan"
 		;;
-	jdcloud,re-ss-01|\
+	jdcloud,re-ss-01)
+		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan"
+		ucidef_set_interface "lan" ipaddr "192.168.6.1"
+		;;
 	qihoo,360v6)
 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan"
 		;;

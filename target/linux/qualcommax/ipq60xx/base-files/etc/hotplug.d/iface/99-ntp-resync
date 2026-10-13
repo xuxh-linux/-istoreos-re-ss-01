@@ -1,0 +1,8 @@
+#!/bin/sh
+# busybox ntpd 若在上联网络就绪前启动，域名解析失败后不会恢复；
+# 接口 ifup 时 sysntpd 只做 reload，参数不变则 procd 不会重启实例。
+# 因此在尚未对过时的情况下，接口上线时主动重启一次 sysntpd。
+[ "$ACTION" = "ifup" ] || exit 0
+[ -f /var/state/ntp-synced ] && exit 0
+/etc/init.d/sysntpd enabled || exit 0
+/etc/init.d/sysntpd restart

@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# JDCloud RE-SS-01 首次启动默认值。
+#
+
+. /lib/functions.sh
+
+[ "$(board_name)" = "jdcloud,re-ss-01" ] || exit 0
+
+# LAN 口 DHCPv4 强制开启。
+# dnsmasq 启动前会用 udhcpc 探测 br-lan 上是否已有 DHCP 服务器，
+# 探测到就拒绝下发地址（只剩 odhcpd 的 IPv6 RA），这里用 force 跳过探测。
+uci -q batch <<-EOF >/dev/null
+	set dhcp.lan=dhcp
+	set dhcp.lan.interface='lan'
+	set dhcp.lan.start='100'
+	set dhcp.lan.limit='150'
+	set dhcp.lan.leasetime='12h'
+	set dhcp.lan.dhcpv4='server'
+	set dhcp.lan.force='1'
+	delete dhcp.lan.ignore
+	commit dhcp
+EOF
+
+# iStoreOS 的 zram-swap 默认关闭（需 zram_enabled=1 才启动）
+uci -q batch <<-EOF >/dev/null
+	set system.@system[0].zram_enabled='1'
+	commit system
+EOF
+
+# 软件流量卸载必须关闭：flowtable 会让已建立连接的后续包走快速路径、
+# 绕过 dae/daed 的 tc eBPF，造成 TLS 握手中途数据错乱（dae 官方亦要求关闭）
+uci -q batch <<-EOF >/dev/null
+	set firewall.@defaults[0].flow_offloading='0'
+	commit firewall
+EOF
+
+# 未配置就默认启动的服务：
+#   frpc       示例配置连 127.0.0.1:7000，开机即进入 crash loop
+#   haproxy    示例配置监听 :81 :444 :60000（passwall 用自己的配置另行拉起）
+#   tailscale  未登录也常驻约 70MB 内存
+#   mwan3      单 WAN 下无意义，持续 ping 1.1.1.1 刷日志，且其 fwmark/策略路由
+#              与 dae/daed 的打标路由有潜在冲突
+# procd 在 S10boot 之前就展开了 rc.d 列表，这里删掉软链后本次启动即不再拉起
+for s in frpc haproxy tailscale mwan3; do
+	[ -x "/etc/init.d/$s" ] && "/etc/init.d/$s" disable
+done
+
+exit 0

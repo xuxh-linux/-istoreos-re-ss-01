@@ -1,0 +1,6 @@
+#!/bin/sh
+# ntpd 首次报告 stratum 即视为已对时，供 iface/99-ntp-resync 判断
+[ "$ACTION" = "stratum" ] || exit 0
+[ -f /var/state/ntp-synced ] && exit 0
+mkdir -p /var/state
+date > /var/state/ntp-synced

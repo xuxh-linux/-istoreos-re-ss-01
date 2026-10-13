@@ -148,9 +148,7 @@ platform_do_upgrade() {
 		tplink_do_upgrade "$1"
 		;;
 	jdcloud,re-ss-01)
-		kernelname="0:HLOS"
-		rootfsname="rootfs"
-		mmc_do_upgrade "$1"
+		jdcloud_do_upgrade "$1"
 		;;
 	yuncore,fap650)
 		[ "$(fw_printenv -n owrt_env_ver 2>/dev/null)" != "7" ] && yuncore_fap650_env_setup

@@ -119,6 +119,18 @@ jobs:
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # packages feed 里的 xray-core（26.3.x）先于 passwall_packages 被安装，
+          # 而 passwall 生成的配置要求 Xray >= 26.7.11，旧核心直接拒绝启动。
+          # 改用 passwall_packages 里与 passwall 配套的版本。
+          ./scripts/feeds uninstall xray-core
+          ./scripts/feeds install -p passwall_packages xray-core
+          # passwall_packages 已跟到 Xray 26.9.x，其 go.mod 要求 Go >= 1.27，
+          # 而 packages feed 只有 Go 1.26。固定到 26.7.28：仍满足 passwall 的
+          # 最低要求（26.7.11），且是最后一个 go 1.26 的版本。升级 Go 后可去掉。
+          sed -i \
+            -e 's/^PKG_VERSION:=.*/PKG_VERSION:=26.7.28/' \
+            -e 's/^PKG_HASH:=.*/PKG_HASH:=a9afe86349c7bd3e6cae60125e62a5ada09d102e1a2760623e77c24a84dbfb46/' \
+            feeds/passwall_packages/xray-core/Makefile
           echo "::group::store feed（iStore 应用商店本体）是否已注册"
           ./scripts/feeds list -n 2>/dev/null | grep -E '^(luci-app-store|taskd|luci-lib-taskd|luci-lib-xterm)$' || \
             echo "警告：store feed 中的包未列出"
@@ -140,6 +152,11 @@ jobs:
           CONFIG_TARGET_qualcommax_ipq60xx=y
           CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_jdcloud_re-ss-01=y
           CONFIG_TARGET_ROOTFS_SQUASHFS=y
+          # initramfs 镜像会把整个 rootfs 打进内存（约 200MB），512MB 机型
+          # 无法 TFTP 启动，只会拖慢编译、占用 Release 空间
+          # CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+          # 小内存机型用 zram 做压缩交换，降低 OOM 概率
+          CONFIG_PACKAGE_zram-swap=y
           CONFIG_KERNEL_BUILD_USER="natserver"
           CONFIG_KERNEL_BUILD_DOMAIN="istoreos"
 
@@ -216,8 +233,6 @@ jobs:
           CONFIG_PACKAGE_luci-app-samba4=y
           CONFIG_PACKAGE_samba4-server=y
           CONFIG_PACKAGE_samba4-libs=y
-          CONFIG_PACKAGE_luci-app-ksmbd=y
-          CONFIG_PACKAGE_ksmbd-server=y
           CONFIG_PACKAGE_webdavfs=y
           CONFIG_PACKAGE_luci-app-nfs=y
           CONFIG_PACKAGE_luci-app-cifs-mount=y
@@ -230,9 +245,6 @@ jobs:
           CONFIG_PACKAGE_luci-app-wol=y
           CONFIG_PACKAGE_luci-app-upnp=y
           CONFIG_PACKAGE_luci-app-ddns=y
-          CONFIG_PACKAGE_luci-app-dockerman=y
-          CONFIG_PACKAGE_docker=y
-          CONFIG_PACKAGE_dockerd=y
           CONFIG_PACKAGE_luci-app-filetransfer=y
           CONFIG_PACKAGE_luci-lib-fs=y
           CONFIG_PACKAGE_luci-app-tn-netports=y
@@ -255,8 +267,6 @@ jobs:
           CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-samba4-zh-cn=y
-          CONFIG_PACKAGE_luci-i18n-ksmbd-zh-cn=y
-          CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-ddns-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-wol-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
@@ -271,6 +281,9 @@ jobs:
           CONFIG_DEVEL=y
           CONFIG_BPF_TOOLCHAIN_HOST=y
           CONFIG_KERNEL_DEBUG_INFO=y
+          # BTF 依赖 !KERNEL_DEBUG_INFO_REDUCED，而 REDUCED 默认是 y，
+          # 不显式关掉的话 defconfig 会把 BTF 静默丢弃，daed 无法加载
+          # CONFIG_KERNEL_DEBUG_INFO_REDUCED is not set
           CONFIG_KERNEL_DEBUG_INFO_BTF=y
           CONFIG_KERNEL_CGROUPS=y
           CONFIG_KERNEL_CGROUP_BPF=y
@@ -294,6 +307,33 @@ jobs:
           # 所以只能像这样编进固件，没有「下载安装包单独装」这条路。
           # ===============================================================
           CONFIG_PACKAGE_kmod-tun=y
+
+          # ===============================================================
+          # K. 预装应用（与本地 .config 保持一致，刷机即用，无需另装）
+          # ===============================================================
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
+          CONFIG_PACKAGE_luci-app-homeproxy=y
+          CONFIG_PACKAGE_luci-i18n-homeproxy-zh-cn=y
+          CONFIG_PACKAGE_dae=y
+          CONFIG_PACKAGE_daed=y
+          CONFIG_PACKAGE_luci-app-daede=y
+          CONFIG_DAE_USE_KERNEL_BTF=y
+          CONFIG_DAED_USE_KERNEL_BTF=y
+          CONFIG_PACKAGE_mosdns=y
+          CONFIG_PACKAGE_luci-app-mosdns=y
+          CONFIG_PACKAGE_luci-i18n-mosdns-zh-cn=y
+
+          # ===============================================================
+          # L. 无线：完整版 wpad（802.11k/v）+ usteer 双频引导 + 中继
+          # ===============================================================
+          # CONFIG_PACKAGE_wpad-basic-mbedtls is not set
+          CONFIG_PACKAGE_wpad-mbedtls=y
+          CONFIG_PACKAGE_usteer=y
+          CONFIG_PACKAGE_luci-app-usteer=y
+          CONFIG_PACKAGE_luci-i18n-usteer-zh-cn=y
+          CONFIG_PACKAGE_relayd=y
+          CONFIG_PACKAGE_luci-proto-relay=y
           EOF
 
       - name: 展开默认配置并校验机型 (defconfig + verify)
@@ -310,6 +350,17 @@ jobs:
             exit 1
           fi
           echo "机型已正确选中: jdcloud_re-ss-01"
+          # daed/dae 依赖的内核选项同样会被 defconfig 静默丢弃，这里硬断言
+          bad=0
+          for k in KERNEL_DEBUG_INFO_BTF KERNEL_BPF_EVENTS KERNEL_CGROUP_BPF KERNEL_XDP_SOCKETS; do
+            if grep -q "^CONFIG_${k}=y" .config; then
+              echo "  ok      CONFIG_${k}"
+            else
+              echo "::error::CONFIG_${k} 在 defconfig 后丢失（daed 将无法运行）"
+              bad=1
+            fi
+          done
+          [ "$bad" -eq 0 ] || exit 1
 
       - name: 依赖闭环校验 (Verify full UI stack survived defconfig)
         run: |
@@ -346,11 +397,16 @@ jobs:
           luci-app-samba4
           "
           SOFT="
-          luci-app-ksmbd
+          luci-app-passwall
+          luci-app-homeproxy
+          luci-app-daede
+          luci-app-mosdns
+          wpad-mbedtls
+          usteer
+          luci-proto-relay
           luci-app-wol
           luci-app-upnp
           luci-app-ddns
-          luci-app-dockerman
           luci-app-filetransfer
           luci-app-nfs
           luci-app-cifs-mount
@@ -359,7 +415,6 @@ jobs:
           luci-app-hd-idle
           luci-app-package-manager
           webdavfs
-          ksmbd-server
           samba4-server
           minidlna
           "
@@ -442,7 +497,7 @@ jobs:
             exit 1
           fi
           echo "::group::固件包清单中的界面组件"
-          grep -E "quickstart|store|taskd|samba|ksmbd|webdav|dockerman|argon|minidlna" "$MANIFEST" || echo "  （无命中）"
+          grep -E "quickstart|store|taskd|samba|ksmbd|webdav|argon|minidlna" "$MANIFEST" || echo "  （无命中）"
           echo "::endgroup::"
 
           # 固件必须真的含有首页组件，否则这次构建算白干

@@ -16,8 +16,21 @@
 
 ## 内置软件
 
-- **eBPF / BTF 内核支持**：已开启 BTF、XDP、BPF Events、CGROUPS、BPF 工具链，并内置 daed 所需内核模块（kmod-sched-core / kmod-sched-bpf / kmod-veth / kmod-xdp-sockets-diag）；
-- **TUN/TAP 虚拟网卡（kmod-tun）**：TUN 模式代理可直接使用。
+- **代理插件（预装，默认全部关闭，同一时间只开一个）**：大鹅 daed + luci-app-daede、PassWall（Xray 26.7.28）、HomeProxy、mosdns；
+- **eBPF / BTF 内核支持**：已开启 BTF、XDP、BPF Events、CGROUPS，并内置 daed 所需内核模块（kmod-sched-core / kmod-sched-bpf / kmod-veth / kmod-xdp-sockets-diag）；
+- **TUN/TAP 虚拟网卡（kmod-tun）**：TUN 模式代理可直接使用；
+- **无线**：完整版 wpad（802.11k/v）+ usteer 双频引导，relayd + luci-proto-relay 中继桥接；
+- **zram-swap**：默认开启压缩交换，降低小内存机型 OOM 概率。
+
+## 默认设置
+
+| 项目 | 默认值 |
+| --- | --- |
+| 后台地址 | `http://192.168.6.1`（LAN DHCP 已开启） |
+| WiFi | `404 Not Found`（2.4G/5G 同名，usteer 自动选频段），密码 `12345678`，首次启动自动开启 |
+| 默认关闭的服务 | 软件流量卸载（会绕过 dae 的 eBPF）、mwan3（单 WAN 无意义）、frpc、haproxy、tailscale |
+
+刷机后请立即修改 root 密码和 WiFi 密码。
 
 ## 刷机流程
 
@@ -61,21 +74,53 @@
   - 精简部分机型包含的额外 DTB，减小 U-Boot 大小。
 <!-- UBOOT-NOTES-END -->
 
-## 安装加强版 daed（大鹅）
+## 大鹅 daed 配置要点
 
-国内网络复制链接一键安装：
+daed 已预装，在 `服务` 菜单或 `http://192.168.6.1:2023` 打开面板，首次进入先创建账号，然后导入订阅、新建分组（把订阅加进去）、点右上角运行。以下几项不按此设置会出问题：
 
-```sh
-wget --no-check-certificate -O - https://ghfast.top/https://raw.githubusercontent.com/kenzok8/openwrt-daede/refs/heads/main/scripts/install.sh | ash
+1. **全局配置 → LAN 接口选 `br-lan`**（有线和 WiFi 都桥接在里面；只选 lan1~lan3 时 WiFi 设备不走代理）。
+2. **全局配置 → 拨号模式选 `domain+`**。默认的 `domain` 只对经 dae 解析的 IP 改用域名拨号，路由器本机等 DNS 不经过 dae 的流量会拿被污染的 IP 去拨号，表现为 TLS 握手中途断开。
+3. **DNS 配置**：把 `.lan` 交给本机 dnsmasq（否则局域网主机名无法解析），并用 geosite 拦截广告（dae 接管 DNS 后 adblock 不再生效）：
+
+```
+dns {
+upstream {
+  alidns: 'udp://223.5.5.5:53'
+  googledns: 'tcp+udp://8.8.8.8:53'
+  local: 'udp://127.0.0.1:53'
+}
+routing {
+  request {
+    qname(suffix: lan) -> local
+    qname(geosite:category-ads-all) -> reject
+    qname(geosite:cn) -> alidns
+    fallback: googledns
+  }
+}
+}
 ```
 
-512m内存的设备节点不要搞太多，搞太多爆内存，路由器会死掉。
+4. **路由规则**可用默认模板：
+
+```
+pname(NetworkManager, systemd-resolved, dnsmasq) -> must_direct
+dip(geoip:private) -> direct
+dip(geoip:cn) -> direct
+domain(geosite:cn) -> direct
+fallback: proxy
+```
+
+切换到 PassWall 前先在面板里停止 daed；两者同时运行会争抢防火墙和 DNS。512M 内存的设备节点不要搞太多，搞太多爆内存，路由器会死掉。
 
 ## 其他翻墙插件
 
-下载地址：[Are-u-ok iStoreOS_25.12 发布页](https://github.com/bcseputetto/Are-u-ok/releases/tag/iStoreOS_25.12)（AX1800 Pro 为 aarch64_a53 架构，请下载对应版本）。
+固件已预装大鹅、PassWall、HomeProxy、mosdns，一般无需另装。其他插件（OpenClash、Nikki 等）下载地址：[Are-u-ok iStoreOS_25.12 发布页](https://github.com/bcseputetto/Are-u-ok/releases/tag/iStoreOS_25.12)（AX1800 Pro 为 aarch64_a53 架构，请下载对应版本）。
 
-## 无线（手动开启）
+## 无线
+
+首次启动自动开启，双频同名 `404 Not Found`。usteer 依赖 802.11k/v 引导终端选择频段，可在 `网络 → usteer` 查看。
+
+做 WiFi 中继时，同一频段的 AP 会被强制切到上级 WiFi 的信道，中继断开时该频段 AP 也会短暂掉线；建议用 5G 连接上级，2.4G 保持覆盖。
 
 ## 感谢
 

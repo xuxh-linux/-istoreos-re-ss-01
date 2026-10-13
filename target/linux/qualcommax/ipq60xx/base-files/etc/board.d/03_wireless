@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# 首次启动时默认开启无线：mac80211.uc 只有在 board.json 里带有
+# wlan.defaults（且 5G 需要 country）时，才会生成 disabled=0 的 wifi-iface。
+#
+
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+case "$(board_name)" in
+jdcloud,re-ss-01)
+	ucidef_set_country "CN"
+	# 双频同名，由 usteer（802.11k/v）引导终端选频段
+	ucidef_set_wireless all "404 Not Found" "psk2" "12345678"
+	;;
+esac
+
+board_config_flush
+
+exit 0
