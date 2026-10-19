@@ -1,0 +1,53 @@
+#!/bin/sh
+# JDCloud RE-SS-01：QMI / MBIM 4G 模块插上即用。
+# 出现 cdc-wdm 控制口时，建一个 proto=modemmanager 的 modem 接口并加入
+# wan 区域，交给 ModemManager 拨号。APN 留空即使用模块 / SIM 的默认承载，
+# 国内三大运营商一般可直接连上；专网卡请在「网络 → 接口 → modem」填 APN。
+# metric 30：同时在线时有线 WAN、USB 共享优先。
+# 用户改过 modem（proto 不是 modemmanager）后不再改动。
+
+[ "$ACTION" = "add" ] || exit 0
+case "$DEVNAME" in cdc-wdm*) ;; *) exit 0 ;; esac
+[ -x /usr/sbin/ModemManager ] || exit 0
+
+. /lib/functions.sh
+[ "$(board_name)" = "jdcloud,re-ss-01" ] || exit 0
+
+# 向上找到带 idVendor 的 USB 设备目录（ModemManager 用它标识模块）
+dev="$(readlink -f "/sys$DEVPATH")"
+while [ -n "$dev" ] && [ "$dev" != "/sys" ] && [ ! -f "$dev/idVendor" ]; do
+	dev="${dev%/*}"
+done
+[ -f "$dev/idVendor" ] || exit 0
+
+if [ "$(uci -q get network.modem)" = "interface" ]; then
+	[ "$(uci -q get network.modem.proto)" = "modemmanager" ] || exit 0
+	cur="$(uci -q get network.modem.device)"
+	[ "$cur" = "$dev" ] && exit 0
+	[ -n "$cur" ] && [ -d "$cur" ] && exit 0
+	uci -q set network.modem.device="$dev"
+else
+	uci -q batch <<-EOF >/dev/null
+		set network.modem=interface
+		set network.modem.proto='modemmanager'
+		set network.modem.device='$dev'
+		set network.modem.apn=''
+		set network.modem.iptype='ipv4v6'
+		set network.modem.metric='30'
+		set network.modem.signalrate='30'
+	EOF
+fi
+uci -q commit network
+
+zone="$(uci -q show firewall | sed -n "s/^firewall\.\([^.]*\)\.name='wan'$/\1/p" | head -n1)"
+if [ -n "$zone" ]; then
+	case " $(uci -q get firewall.$zone.network) " in
+		*" modem "*) ;;
+		*) uci -q add_list firewall.$zone.network='modem'
+		   uci -q commit firewall
+		   /etc/init.d/firewall reload >/dev/null 2>&1 ;;
+	esac
+fi
+
+logger -t modem "$DEVNAME ($(cat "$dev/idVendor"):$(cat "$dev/idProduct")) -> modem"
+ubus call network reload >/dev/null 2>&1

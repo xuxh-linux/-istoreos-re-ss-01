@@ -1,0 +1,59 @@
+#!/bin/sh
+# JDCloud RE-SS-01：USB 网络共享插上即用。
+# 手机 USB 共享、HiLink 型 4G 上网卡 / 随身 WiFi、ECM 模式的 4G 模块
+# 自带 DHCP，自动建 usbwan 接口并加入 wan 区域。metric 20 低于有线 WAN，
+# 两者同时在线时走有线，有线断开后默认路由落到 usbwan。
+# 只认下列驱动：USB 有线网卡（r8152 / ax88179 等）可能被用来扩展 LAN，
+# 不自动处理；QMI / MBIM 模块（wwan0）由 usbmisc/30-re-ss-01-modem 交给
+# ModemManager 拨号。用户改过 usbwan（proto 不是 dhcp）后不再改动。
+
+[ "$ACTION" = "add" ] || exit 0
+[ -n "$INTERFACE" ] || exit 0
+
+drv="$(readlink -f "/sys/class/net/$INTERFACE/device/driver" 2>/dev/null)"
+case "${drv##*/}" in
+	rndis_host|cdc_ether|cdc_ncm|ipheth) ;;
+	*) exit 0 ;;
+esac
+
+. /lib/functions.sh
+[ "$(board_name)" = "jdcloud,re-ss-01" ] || exit 0
+
+# 已被用户配置到其他接口上就不动
+uci -q show network | grep -vE '^network\.usbwan6?\.' | \
+	grep -qx "network\.[^.]*\.device='$INTERFACE'" && exit 0
+
+if [ "$(uci -q get network.usbwan)" = "interface" ]; then
+	[ "$(uci -q get network.usbwan.proto)" = "dhcp" ] || exit 0
+	cur="$(uci -q get network.usbwan.device)"
+	[ "$cur" = "$INTERFACE" ] && exit 0
+	# 上一个设备还在（同时插了两个）时保留原来的
+	[ -n "$cur" ] && [ -e "/sys/class/net/$cur" ] && exit 0
+	uci -q set network.usbwan.device="$INTERFACE"
+else
+	uci -q batch <<-EOF >/dev/null
+		set network.usbwan=interface
+		set network.usbwan.proto='dhcp'
+		set network.usbwan.device='$INTERFACE'
+		set network.usbwan.metric='20'
+		set network.usbwan6=interface
+		set network.usbwan6.proto='dhcpv6'
+		set network.usbwan6.device='@usbwan'
+		set network.usbwan6.reqaddress='try'
+		set network.usbwan6.reqprefix='auto'
+	EOF
+fi
+uci -q commit network
+
+zone="$(uci -q show firewall | sed -n "s/^firewall\.\([^.]*\)\.name='wan'$/\1/p" | head -n1)"
+if [ -n "$zone" ]; then
+	nets=" $(uci -q get firewall.$zone.network) "
+	for n in usbwan usbwan6; do
+		case "$nets" in *" $n "*) ;; *) uci -q add_list firewall.$zone.network="$n" ;; esac
+	done
+	uci -q commit firewall
+	/etc/init.d/firewall reload >/dev/null 2>&1
+fi
+
+logger -t usbwan "$INTERFACE (${drv##*/}) -> usbwan"
+ubus call network reload >/dev/null 2>&1

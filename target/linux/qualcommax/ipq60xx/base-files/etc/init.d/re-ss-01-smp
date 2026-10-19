@@ -1,0 +1,39 @@
+#!/bin/sh /etc/rc.common
+#
+# JDCloud RE-SS-01：把 WiFi / 有线网卡的中断分散到 4 个核心。
+# GIC 遇到多核掩码（默认 0-3）时只投递给编号最小的 CPU，所以不处理的话
+# 所有中断和对应的软中断都压在 CPU0 上；irqbalance 在这里也不会调整。
+# 中断号随驱动加载顺序变化，按 /proc/interrupts 里的名称匹配。
+# ath11k 在 S10boot 加载 /etc/modules.d 时就申请了中断，S99 时已经存在。
+
+START=99
+
+# 名称 CPU 掩码（CPU0=1 CPU1=2 CPU2=4 CPU3=8）
+IRQ_MAP="
+reo2host-destination-ring1 2
+reo2host-destination-ring2 4
+reo2host-destination-ring3 8
+reo2host-destination-ring4 1
+wbm2host-tx-completions-ring1 2
+wbm2host-tx-completions-ring2 4
+wbm2host-tx-completions-ring3 8
+wbm2host-rx-release 8
+edma_txcmpl 2
+edma_rxdesc 4
+"
+
+boot() {
+	start
+}
+
+start() {
+	. /lib/functions.sh
+	[ "$(board_name)" = "jdcloud,re-ss-01" ] || return 0
+
+	echo "$IRQ_MAP" | while read -r name mask; do
+		[ -n "$name" ] || continue
+		irq=$(awk -v n="$name" '$NF == n { sub(":", "", $1); print $1; exit }' /proc/interrupts)
+		[ -n "$irq" ] && [ -w "/proc/irq/$irq/smp_affinity" ] || continue
+		echo "$mask" > "/proc/irq/$irq/smp_affinity" 2>/dev/null
+	done
+}

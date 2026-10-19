@@ -131,6 +131,24 @@ jobs:
             -e 's/^PKG_VERSION:=.*/PKG_VERSION:=26.7.28/' \
             -e 's/^PKG_HASH:=.*/PKG_HASH:=a9afe86349c7bd3e6cae60125e62a5ada09d102e1a2760623e77c24a84dbfb46/' \
             feeds/passwall_packages/xray-core/Makefile
+          # luci-app-daede 的 uci-defaults 开了 set -e，迁移旧字段时
+          # `uci -q delete` 删除不存在的选项会返回 1，脚本中途退出：
+          # 文件残留在 /etc/uci-defaults/ 每次开机重跑，`uci commit dae` 永不执行。
+          daede_init=feeds/daede/luci-app-daede/root/etc/uci-defaults/90-luci-app-daede-init
+          sed -i -E 's/^([[:space:]]*uci -q delete dae\.@group\[\$i\]\.filter_(sub|node) 2>\/dev\/null)$/\1 || true/' "$daede_init"
+          if grep -nE '^[[:space:]]*uci -q delete .*filter_(sub|node)' "$daede_init" | grep -v '|| true'; then
+            echo "::error::90-luci-app-daede-init 仍有未兜底的 uci delete，set -e 下会中断"
+            exit 1
+          fi
+          # luci-app-nfs 的 /etc/init.d/nfs 是 S45，早于 nfsd（S99）创建
+          # /var/lib/nfs，开机 exportfs 报 "could not open /var/lib/nfs/.etab.lock"
+          nfs_init=feeds/third/luci-app-nfs/root/etc/init.d/nfs
+          grep -q 'mkdir -p /var/lib/nfs' "$nfs_init" || \
+            sed -i 's|^start() {$|start() {\n    mkdir -p /var/lib/nfs|' "$nfs_init"
+          if ! grep -q 'mkdir -p /var/lib/nfs' "$nfs_init"; then
+            echo "::error::luci-app-nfs init 补丁未生效（start() 结构变了？）"
+            exit 1
+          fi
           echo "::group::store feed（iStore 应用商店本体）是否已注册"
           ./scripts/feeds list -n 2>/dev/null | grep -E '^(luci-app-store|taskd|luci-lib-taskd|luci-lib-xterm)$' || \
             echo "警告：store feed 中的包未列出"
@@ -157,6 +175,11 @@ jobs:
           # CONFIG_TARGET_ROOTFS_INITRAMFS is not set
           # 小内存机型用 zram 做压缩交换，降低 OOM 概率
           CONFIG_PACKAGE_zram-swap=y
+          # zram 默认只编 lzo 后端；加 zstd（压缩率高得多）并设为默认，
+          # 保留 lzo 兼容旧配置里的 zram_comp_algo='lzo'
+          CONFIG_KERNEL_ZRAM_BACKEND_LZO=y
+          CONFIG_KERNEL_ZRAM_BACKEND_ZSTD=y
+          CONFIG_KERNEL_ZRAM_DEF_COMP_ZSTD=y
           CONFIG_KERNEL_BUILD_USER="natserver"
           CONFIG_KERNEL_BUILD_DOMAIN="istoreos"
 
@@ -334,6 +357,39 @@ jobs:
           CONFIG_PACKAGE_luci-i18n-usteer-zh-cn=y
           CONFIG_PACKAGE_relayd=y
           CONFIG_PACKAGE_luci-proto-relay=y
+
+          # ===============================================================
+          # M. 4G USB 网卡 / 模块 / 手机 USB 共享
+          # ===============================================================
+          # kmod 源对自编内核不可用（404），驱动必须编进固件。
+          # 插上后由 hotplug.d/net/30-re-ss-01-usbwan（DHCP 类）和
+          # hotplug.d/usbmisc/30-re-ss-01-modem（QMI/MBIM → ModemManager）自动建接口。
+          # 串口：大多数模块的 AT / 诊断口
+          CONFIG_PACKAGE_kmod-usb-serial-option=y
+          CONFIG_PACKAGE_kmod-usb-serial-qualcomm=y
+          CONFIG_PACKAGE_kmod-usb-acm=y
+          # 网卡：QMI / MBIM / ECM / NCM / 华为 NCM / RNDIS / iPhone
+          CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+          CONFIG_PACKAGE_kmod-usb-net-huawei-cdc-ncm=y
+          CONFIG_PACKAGE_kmod-usb-net-rndis=y
+          CONFIG_PACKAGE_kmod-usb-net-ipheth=y
+          CONFIG_PACKAGE_usbmuxd=y
+          # 很多上网卡插上先是光驱，要切换到网卡模式
+          CONFIG_PACKAGE_usb-modeswitch=y
+          # 拨号：ModemManager（自动配置用它）+ 各协议的手动拨号
+          CONFIG_PACKAGE_modemmanager=y
+          CONFIG_PACKAGE_luci-proto-modemmanager=y
+          CONFIG_PACKAGE_uqmi=y
+          CONFIG_PACKAGE_luci-proto-qmi=y
+          CONFIG_PACKAGE_umbim=y
+          CONFIG_PACKAGE_luci-proto-mbim=y
+          CONFIG_PACKAGE_comgt=y
+          CONFIG_PACKAGE_comgt-ncm=y
+          CONFIG_PACKAGE_luci-proto-3g=y
+          CONFIG_PACKAGE_luci-proto-ncm=y
           EOF
 
       - name: 展开默认配置并校验机型 (defconfig + verify)
@@ -357,6 +413,15 @@ jobs:
               echo "  ok      CONFIG_${k}"
             else
               echo "::error::CONFIG_${k} 在 defconfig 后丢失（daed 将无法运行）"
+              bad=1
+            fi
+          done
+          # 99_re-ss-01-defaults 把 zram_comp_algo 设成 zstd，后端缺失会回落到 lzo
+          for k in KERNEL_ZRAM_BACKEND_ZSTD KERNEL_ZRAM_DEF_COMP_ZSTD; do
+            if grep -q "^CONFIG_${k}=y" .config; then
+              echo "  ok      CONFIG_${k}"
+            else
+              echo "::error::CONFIG_${k} 在 defconfig 后丢失（zram 无法使用 zstd）"
               bad=1
             fi
           done
@@ -404,6 +469,11 @@ jobs:
           wpad-mbedtls
           usteer
           luci-proto-relay
+          modemmanager
+          luci-proto-modemmanager
+          kmod-usb-serial-option
+          kmod-usb-net-cdc-mbim
+          usb-modeswitch
           luci-app-wol
           luci-app-upnp
           luci-app-ddns
@@ -472,6 +542,11 @@ jobs:
       - name: 编译固件 (Build firmware)
         run: |
           set -o pipefail
+          # 版本号带上构建时间：scripts/getver.sh 优先读取根目录 version 文件，
+          # 写入 DISTRIB_REVISION，否则同一提交的多次构建无法区分
+          rm -f version
+          echo "$(./scripts/getver.sh)-$(date +%y%m%d%H%M)" > version
+          echo "固件版本号：$(cat version)"
           echo "开始编译 JDCloud RE-SS-01, 并行度 $(nproc)"
           if ! make -j"$(nproc)" 2>&1 | tee build.log; then
             echo "::warning::并行编译失败，回退单线程 V=s 重试以获取完整错误信息"

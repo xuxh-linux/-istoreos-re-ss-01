@@ -7,6 +7,19 @@
 
 [ "$(board_name)" = "jdcloud,re-ss-01" ] || exit 0
 
+# uci-defaults 在每次 sysupgrade 后都会重跑（脚本执行后留下的 whiteout
+# 不在备份里），保留配置升级时会把用户改过的 DHCP、手动开启的
+# tailscale/frpc 等全部重置。system 里记录已应用到第几批默认值
+# （随 /etc/config/system 一起被保留），升级时只补跑新增的批次。
+# 以后新增默认值：追加一个 [ "$ver" -lt N ] 段，并把末尾的标记改成 N。
+ver="$(uci -q get system.@system[0].re_ss_01_defaults)"
+case "$ver" in
+	''|*[!0-9]*) ver=0 ;;
+esac
+
+# ---- 第 1 批：首次安装 ----
+if [ "$ver" -lt 1 ]; then
+
 # LAN 口 DHCPv4 强制开启。
 # dnsmasq 启动前会用 udhcpc 探测 br-lan 上是否已有 DHCP 服务器，
 # 探测到就拒绝下发地址（只剩 odhcpd 的 IPv6 RA），这里用 force 跳过探测。
@@ -45,5 +58,71 @@ EOF
 for s in frpc haproxy tailscale mwan3; do
 	[ -x "/etc/init.d/$s" ] && "/etc/init.d/$s" disable
 done
+
+# watchcat 上游默认 6 小时 ping 不通 8.8.8.8 就重启，国内 8.8.8.8 不稳定，
+# 容易误重启。换成国内公共 DNS，任一能 ping 通即视为在线。
+if [ "$(uci -q get watchcat.@watchcat[0].pinghosts)" = "8.8.8.8" ]; then
+	uci -q batch <<-EOF >/dev/null
+		set watchcat.@watchcat[0].pinghosts='223.5.5.5 119.29.29.29'
+		commit watchcat
+	EOF
+fi
+
+fi
+
+# ---- 第 2 批：zram zstd、adblock ----
+# 已装机升级上来也会执行一次，所以只改仍是出厂值 / 自动探测错误的项，
+# 不覆盖用户自己改过的设置。
+if [ "$ver" -lt 2 ]; then
+
+# 内核已编入 zstd 后端，压缩率明显高于 lzo，小内存机型能多换出不少页。
+# zram.init 在未设置时回落到 lzo，所以未设置也按出厂值处理。
+case "$(uci -q get system.@system[0].zram_comp_algo)" in
+''|lzo|lzo-rle)
+	uci -q batch <<-EOF >/dev/null
+		set system.@system[0].zram_comp_algo='zstd'
+		commit system
+	EOF
+	;;
+esac
+
+# adblock 默认开启，但会按 smartdns -> dnsmasq 的顺序自动选 DNS 后端，
+# 而 smartdns 默认不运行，结果拦截 0 条；也没有触发接口，开机时 WAN 未通
+# 下载失败后不再重试。改用 dnsmasq，WAN/WWAN 上线后再拉规则。
+adb_dns="$(uci -q get adblock.global.adb_dns)"
+if [ -z "$adb_dns" ] || { [ "$adb_dns" = "smartdns" ] && \
+		[ "$(uci -q get smartdns.@smartdns[0].enabled)" != "1" ]; }; then
+	uci -q set adblock.global.adb_dns='dnsmasq'
+fi
+[ -n "$(uci -q get adblock.global.adb_trigger)" ] || uci -q batch <<-EOF >/dev/null
+	add_list adblock.global.adb_trigger='wan'
+	add_list adblock.global.adb_trigger='wwan'
+EOF
+# 规则源只留针对国内广告的 anti_ad（约 10 万条，9 秒完成）：出厂的 certpl
+# 国内连不上，adguard 走 GitHub Pages 常卡在传输中途（实测 4 分 44 秒）。
+if [ "$(uci -q get adblock.global.adb_feed)" = "adguard adguard_tracking certpl" ]; then
+	uci -q batch <<-EOF >/dev/null
+		delete adblock.global.adb_feed
+		add_list adblock.global.adb_feed='anti_ad'
+	EOF
+fi
+# adblock 的 curl 只有 --connect-timeout，连上后不动会一直挂住整轮更新，
+# 这里补上 --max-time，其余参数与 adblock.sh 的默认值一致（仅适用于 curl）。
+# 出厂没有 adb_fetchcmd，adblock 运行时才自动探测（curl 排第一），这里提前写明。
+adb_fetch="$(uci -q get adblock.global.adb_fetchcmd)"
+if [ -z "$adb_fetch" ] && command -v curl >/dev/null; then
+	adb_fetch=curl
+	uci -q set adblock.global.adb_fetchcmd='curl'
+fi
+[ "$adb_fetch" = "curl" ] && [ -z "$(uci -q get adblock.global.adb_fetchparm)" ] && \
+	uci -q set adblock.global.adb_fetchparm='--connect-timeout 20 --max-time 180 --retry-delay 10 --retry 4 --retry-max-time 80 --retry-all-errors --fail --silent --show-error --location -o'
+uci -q commit adblock
+
+fi
+
+uci -q batch <<-EOF >/dev/null
+	set system.@system[0].re_ss_01_defaults='2'
+	commit system
+EOF
 
 exit 0

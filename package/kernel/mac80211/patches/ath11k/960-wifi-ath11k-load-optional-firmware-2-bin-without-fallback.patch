@@ -1,0 +1,72 @@
+From: natserver <natserver@istoreos>
+Subject: [PATCH] wifi: ath11k: load optional firmware-2.bin without sysfs fallback
+
+ath11k_fw_pre_init() asks for firmware-2.bin during probe. IPQ6018 ships
+split q6 firmware and has no such file, so with
+CONFIG_FW_LOADER_USER_HELPER_FALLBACK the request falls back to the sysfs
+user helper and the probe (and kmodloader with it) blocks until procd's
+hotplug queue answers. On JDCloud RE-SS-01 the queue is busy probing the
+eMMC partitions at boot and WiFi came up ~40 s late.
+
+Request this optional file directly. Calibration data keeps the fallback,
+since its hotplug handler extracts it from the ART partition on demand.
+
+--- a/drivers/net/wireless/ath/ath11k/core.c
++++ b/drivers/net/wireless/ath/ath11k/core.c
+@@ -1650,6 +1650,34 @@
+ 	return fw;
+ }
+ 
++/* Like ath11k_core_firmware_request() but never falls back to the sysfs
++ * user helper. Use it for optional files that are normally absent: with
++ * CONFIG_FW_LOADER_USER_HELPER_FALLBACK the plain request blocks until
++ * userspace answers, and at boot procd's serialized hotplug queue can take
++ * tens of seconds to get to it while the whole module probe waits.
++ */
++const struct firmware *ath11k_core_firmware_request_direct(struct ath11k_base *ab,
++							   const char *file)
++{
++	const struct firmware *fw;
++	char path[100];
++	int ret;
++
++	if (file == NULL)
++		return ERR_PTR(-ENOENT);
++
++	ath11k_core_create_firmware_path(ab, file, path, sizeof(path));
++
++	ret = request_firmware_direct(&fw, path, ab->dev);
++	if (ret)
++		return ERR_PTR(ret);
++
++	ath11k_dbg(ab, ATH11K_DBG_BOOT, "firmware request %s size %zu\n",
++		   path, fw->size);
++
++	return fw;
++}
++
+ void ath11k_core_free_bdf(struct ath11k_base *ab, struct ath11k_board_data *bd)
+ {
+ 	if (!IS_ERR(bd->fw))
+--- a/drivers/net/wireless/ath/ath11k/core.h
++++ b/drivers/net/wireless/ath/ath11k/core.h
+@@ -1280,6 +1280,8 @@
+ 
+ const struct firmware *ath11k_core_firmware_request(struct ath11k_base *ab,
+ 						    const char *filename);
++const struct firmware *ath11k_core_firmware_request_direct(struct ath11k_base *ab,
++							   const char *file);
+ const char *ath11k_core_get_usecase_firmware(struct ath11k_base *ab);
+ 
+ static inline const char *ath11k_scan_state_str(enum ath11k_scan_state state)
+--- a/drivers/net/wireless/ath/ath11k/fw.c
++++ b/drivers/net/wireless/ath/ath11k/fw.c
+@@ -18,7 +18,7 @@
+ 	const u8 *data;
+ 	__le32 *timestamp;
+ 
+-	ab->fw.fw = ath11k_core_firmware_request(ab, name);
++	ab->fw.fw = ath11k_core_firmware_request_direct(ab, name);
+ 	if (IS_ERR(ab->fw.fw)) {
+ 		ret = PTR_ERR(ab->fw.fw);
+ 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\n", name, ret);

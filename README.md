@@ -20,7 +20,8 @@
 - **eBPF / BTF 内核支持**：已开启 BTF、XDP、BPF Events、CGROUPS，并内置 daed 所需内核模块（kmod-sched-core / kmod-sched-bpf / kmod-veth / kmod-xdp-sockets-diag）；
 - **TUN/TAP 虚拟网卡（kmod-tun）**：TUN 模式代理可直接使用；
 - **无线**：完整版 wpad（802.11k/v）+ usteer 双频引导，relayd + luci-proto-relay 中继桥接；
-- **zram-swap**：默认开启压缩交换，降低小内存机型 OOM 概率。
+- **zram-swap**：默认开启压缩交换（zstd），降低小内存机型 OOM 概率；
+- **中断分核**：WiFi / 有线网卡中断开机自动分散到 4 个核心，避免全部压在 CPU0。
 
 ## 默认设置
 
@@ -29,6 +30,8 @@
 | 后台地址 | `http://192.168.6.1`（LAN DHCP 已开启） |
 | WiFi | `404 Not Found`（2.4G/5G 同名，usteer 自动选频段），密码 `12345678`，首次启动自动开启 |
 | 默认关闭的服务 | 软件流量卸载（会绕过 dae 的 eBPF）、mwan3（单 WAN 无意义）、frpc、haproxy、tailscale |
+| 广告过滤 | adblock 走 dnsmasq，规则源 anti_ad（约 10 万条），WAN 上线后自动拉取 |
+| watchcat | 6 小时 ping 不通 `223.5.5.5`、`119.29.29.29` 才重启 |
 
 刷机后请立即修改 root 密码和 WiFi 密码。
 

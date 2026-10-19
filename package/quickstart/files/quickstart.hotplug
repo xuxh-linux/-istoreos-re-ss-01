@@ -1,3 +1,8 @@
+# 开机冷启动时 quickstart 服务（S92）还没起来，通知了也没人收，而每次调用
+# 要 0.6 秒；eMMC 机型有近 40 个块设备，会把 procd 串行的 hotplug 队列堵住
+# 几十秒，排在后面的 ieee80211 事件（WiFi 上线）也跟着推迟。服务启动后自行
+# 读取磁盘状态，所以服务未运行时直接跳过；运行时放到后台，不阻塞队列。
 if [ "$ACTION" = "add" -o "$ACTION" = "remove" ]; then
-    quickstart blockChange
+    pgrep -f "quickstart serve" >/dev/null || exit 0
+    quickstart blockChange >/dev/null 2>&1 &
 fi
