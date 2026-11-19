@@ -33,6 +33,22 @@
 		bootargs-append = " rootfstype=squashfs,ext4 swiotlb=1 coherent_pool=2M";
 	};
 
+	reserved-memory {
+		/* Keeps the kernel log across a panic or watchdog reset; read it from
+		 * /sys/fs/pstore after the next boot. U-Boot only touches its own
+		 * reserved region, the image load area around 0x44000000 and the
+		 * relocated FDT below fdt_high (0x48500000), so this range survives
+		 * a warm reboot. A power cycle still clears it. */
+		ramoops@50000000 {
+			compatible = "ramoops";
+			reg = <0x0 0x50000000 0x0 0x100000>;
+			record-size = <0x20000>;
+			console-size = <0x40000>;
+			ecc-size = <16>;
+			no-map;
+		};
+	};
+
 	keys {
 		compatible = "gpio-keys";
 		pinctrl-0 = <&button_pins>;

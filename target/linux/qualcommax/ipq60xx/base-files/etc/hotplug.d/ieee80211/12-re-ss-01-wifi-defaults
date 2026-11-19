@@ -1,0 +1,40 @@
+#!/bin/sh
+# JDCloud RE-SS-01：无线默认值。
+# 10-wifi-detect 在 phy 出现时才生成 wireless 配置（ath11k 加载较慢，
+# 晚于 uci-defaults），所以放在 ieee80211 hotplug 里处理。
+# 两个 phy 各自触发一次 add；每项只改一次，用户改过后不会被改回。
+
+[ "$ACTION" = "add" ] || exit 0
+
+. /lib/functions.sh
+[ "$(board_name)" = "jdcloud,re-ss-01" ] || exit 0
+
+changed=0
+
+# 默认 AP 打开 802.11k/v，供 usteer 做双频引导。按 iface 判断：只补从未
+# 设置过的，用户手动关闭（设为 0）后不会被改回。
+for iface in default_radio0 default_radio1; do
+	[ "$(uci -q get wireless.$iface)" = "wifi-iface" ] || continue
+	[ -n "$(uci -q get wireless.$iface.bss_transition)" ] && continue
+	uci -q batch <<-EOT
+		set wireless.$iface.ieee80211k='1'
+		set wireless.$iface.bss_transition='1'
+	EOT
+	changed=1
+done
+
+# 5G 默认信道 36 在国内（CN）限 23 dBm，149-165 上限 33 dBm，本机硬件可到
+# 27 dBm，换到 149 覆盖明显更好（国内设备都支持）。只改仍是出厂值 36 的，
+# 改过一次就打标记，之后用户再设回 36 也不动。
+for radio in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-device$/\1/p"); do
+	[ "$(uci -q get wireless.$radio.band)" = "5g" ] || continue
+	[ -n "$(uci -q get wireless.$radio.re_ss_01_channel)" ] && continue
+	[ "$(uci -q get wireless.$radio.channel)" = "36" ] && \
+		uci -q set wireless.$radio.channel='149'
+	uci -q set wireless.$radio.re_ss_01_channel='1'
+	changed=1
+done
+
+[ "$changed" = "1" ] || exit 0
+uci commit wireless
+ubus call network reload >/dev/null 2>&1
