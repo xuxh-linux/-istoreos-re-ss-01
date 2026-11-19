@@ -684,7 +684,7 @@ jobs:
             echo
             echo "### 刷机"
             echo
-            echo "先刷 HLOS12M 双启动 GPT，再经 U-Boot Web \`/big.html\` 端点刷 factory.bin；进入系统后用 sysupgrade.bin 升级。"
+            echo "U-Boot、GPT 分区表和详细步骤见仓库 [flash/README.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/flash/README.md)：先换 12M U-Boot、刷 HLOS12M 双分区 GPT，再在 U-Boot 网页刷 factory.bin（u-boot-12m.bin 必须走 \`/big.html\`）；进入系统后用 sysupgrade.bin 升级。"
           } > release-body.md
           echo "::group::发布说明预览"
           cat release-body.md

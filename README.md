@@ -61,21 +61,12 @@ make defconfig && make -j$(nproc)
 
 ## 刷机流程
 
-1. 刷 **12M 大分区 U-Boot**（HLOS 12MiB），旧 U-Boot 刷入地址：http://192.168.1.1/uboot.html；
-2. 刷 **2GB GPT 模板**（rootfs 扩到 2048MiB，用于装固件，不能省略）；
-3. 在 U-Boot 网页的 **`http://192.168.1.1/big.html`** 刷本项目 `factory.bin`（完整版或纯净版任选）。**不要用默认首页 `/`**：HLOS12M 分区的内核按 12M 填充，只有 `/big.html` 能正确写入，用 `/` 刷完会卡红灯、没有 IP；
-4. 首次启动后后台地址是 `http://10.0.0.1`；以后升级在系统里用 `sysupgrade.bin`（可以在完整版和纯净版之间互刷，换版本时建议不保留配置）。
+刷机要用的 U-Boot、GPT 分区表，以及每个文件的来源、原地址、SHA256 都整理在 [`flash/`](flash/) 目录，详细步骤见 [flash/README.md](flash/README.md)。简要流程：
 
-### 刷机文件下载
-
-两个文件都在本仓库的 [`flash/`](flash/) 目录里留了一份，原发布地址失效也能下载。
-
-| 文件 | 下载 | 来源 | SHA256 |
-| --- | --- | --- | --- |
-| 12M 大分区 U-Boot（jdcloud_re-ss-01） | [直接下载 .bin](https://github.com/xuxh-linux/-istoreos-re-ss-01/raw/sync/re-ss-01-wifi-4g/flash/uboot-ipq60xx-jdcloud_re-ss-01-260816_142236_3011049.bin) | [chenxin527/uboot-qsdk12.5-build](https://github.com/chenxin527/uboot-qsdk12.5-build/releases/tag/26.08.16-14.22.36-3011049) | `483d1a998d48e3c32f78255908bf21e76d3bf5c580c3eb95cf550996a46c231f` |
-| GPT 模板（rootfs2048M / HLOS12M） | [直接下载 .bin](https://github.com/xuxh-linux/-istoreos-re-ss-01/raw/sync/re-ss-01-wifi-4g/flash/gpt-JDC_AX1800_Pro_dual-boot_rootfs2048M_HLOS12M_no-last-partition.bin) | 原仓库 GHNERCH/DAEWRT-AX1800PRO 已删除，取自分叉 [j55455/DAEWRT-AX1800PRO](https://github.com/j55455/DAEWRT-AX1800PRO) | `21a4e12f1bfc3e17cf65b0ce3817ef59176031aaaedafc1354c9715fd44b5b97` |
-
-GPT 模板已和一台按本流程刷机、正常运行的设备核对过：26 个分区的起止扇区完全一致；设备上多出的最后一个大分区是首次启动时自动建的（文件名里的 no-last-partition 就是指这个）。
+1. 换 12M 大分区 U-Boot：旧 U-Boot 的刷写页是 `http://192.168.1.1/uboot.html`；
+2. 刷 2GB GPT 分区表（rootfs 2048 MiB / HLOS 12 MiB，不能省略）；
+3. 在 U-Boot 网页刷本项目 Releases 里的 `factory.bin`。用 chenxin527 U-Boot 时走它的「固件」页；用 `u-boot-12m.bin` 时必须走 `http://192.168.1.1/big.html`，用默认首页刷会卡红灯；
+4. 首次启动后台地址 `http://10.0.0.1`，以后用 `sysupgrade.bin` 升级。
 
 ### U-Boot 版本说明
 
