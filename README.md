@@ -63,8 +63,8 @@ make defconfig && make -j$(nproc)
 
 1. 刷 **12M 大分区 U-Boot**（HLOS 12MiB），旧 U-Boot 刷入地址：http://192.168.1.1/uboot.html；
 2. 刷 **2GB GPT 模板**（rootfs 扩到 2048MiB，用于装固件，不能省略）；
-3. U-Boot 页面刷本项目 `factory.bin`；
-4. Web 升级 `sysupgrade.bin`。
+3. 在 U-Boot 网页的 **`http://192.168.1.1/big.html`** 刷本项目 `factory.bin`（完整版或纯净版任选）。**不要用默认首页 `/`**：HLOS12M 分区的内核按 12M 填充，只有 `/big.html` 能正确写入，用 `/` 刷完会卡红灯、没有 IP；
+4. 首次启动后后台地址是 `http://10.0.0.1`；以后升级在系统里用 `sysupgrade.bin`（可以在完整版和纯净版之间互刷，换版本时建议不保留配置）。
 
 ### 刷机文件下载
 
