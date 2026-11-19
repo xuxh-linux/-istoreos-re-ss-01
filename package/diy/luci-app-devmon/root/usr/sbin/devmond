@@ -1,0 +1,502 @@
+#!/usr/bin/ucode
+// 设备流量统计守护进程：维护 nft 计数规则和黑名单，按周期采样，写出 stats.json 和 history.json
+
+'use strict';
+
+import { popen, writefile, rename, mkdir, access } from 'fs';
+import { cursor } from 'uci';
+
+const TABLE         = 'inet devmon';
+const RUN_DIR       = '/tmp/devmon';
+const STATS_FILE    = RUN_DIR + '/stats.json';
+const HISTORY_FILE  = RUN_DIR + '/history.json';
+const LEASES_FILE   = '/tmp/dhcp.leases';
+const CONNTRACK_BIN = '/usr/sbin/conntrack';
+
+const MAC_RE   = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/;
+const IFACE_RE = /^[A-Za-z0-9._@-]+$/;
+
+// 邻居表里这些状态说明设备此刻确实在线；STALE 可能在设备离开后保留几分钟，只算空闲
+const ONLINE_STATES = { REACHABLE: true, DELAY: true, PROBE: true, PERMANENT: true, NOARP: true };
+
+// 最近这么多秒内有流量，即使邻居表是 STALE 也算在线
+const ACTIVE_WINDOW = 60;
+
+// 未配置的设备离线超过这么多秒后从内存中移除，避免随机 MAC 的手机越积越多
+const FORGET_AFTER = 86400;
+
+let devs      = {};    // mac -> 设备运行时状态，跨轮保留
+let total     = { tx_rate: 0, rx_rate: 0, hist_tx: [], hist_rx: [] };
+let hist_ts   = [];
+let table_ok  = false;
+let cur_iface = null;
+let map_sig   = null;
+let counters  = {};    // mac -> true，nft 里已建好该设备的 tx_/rx_ 计数器
+let block_sig = null;
+let blocked_ips = {};
+
+function now_mono() {
+	const t = clock(true);
+	return t[0] + t[1] / 1e9;
+}
+
+function clamp(v, lo, hi, def) {
+	if (v == null)
+		return def;
+	v = int(v);
+	if (v != v)
+		return def;
+	return v < lo ? lo : (v > hi ? hi : v);
+}
+
+// 执行命令并返回 stdout，退出码非 0 时返回 null
+function run(cmd) {
+	const p = popen(cmd, 'r');
+	if (!p)
+		return null;
+	const out = p.read('all');
+	return p.close() == 0 ? out : null;
+}
+
+function nft_apply(script) {
+	const p = popen('nft -f - 2>&1', 'w');
+	if (!p)
+		return false;
+	p.write(script);
+	return p.close() == 0;
+}
+
+function load_config() {
+	const c = cursor();
+	const cfg = {
+		iface:    c.get('devmon', 'main', 'iface') || 'br-lan',
+		interval: clamp(c.get('devmon', 'main', 'interval'), 1, 60, 2),
+		history:  clamp(c.get('devmon', 'main', 'history'), 10, 1800, 150),
+		devices:  {},
+		offload:  false
+	};
+
+	if (!match(cfg.iface, IFACE_RE))
+		cfg.iface = 'br-lan';
+
+	c.foreach('devmon', 'device', (s) => {
+		const mac = lc(s.mac || '');
+		if (match(mac, MAC_RE))
+			cfg.devices[mac] = { name: s.name || '', blocked: s.blocked == '1' };
+	});
+
+	// 软/硬件流量卸载后的数据包不经过 forward 钩子，计数会偏小
+	c.foreach('firewall', 'defaults', (s) => {
+		if (s.flow_offloading == '1' || s.flow_offloading_hw == '1')
+			cfg.offload = true;
+	});
+
+	return cfg;
+}
+
+// 返回 mac -> { ip4: [], ip6: [], state }，只含有链路层地址的条目
+function read_neigh(iface) {
+	const res = {};
+
+	for (let fam in [ '4', '6' ]) {
+		const out = run(`ip -${fam} neigh show dev ${iface}`) || '';
+
+		for (let line in split(out, '\n')) {
+			const f = split(trim(line), /\s+/);
+			const li = index(f, 'lladdr');
+			if (li < 0 || li + 1 >= length(f))
+				continue;
+
+			const ip = f[0], mac = lc(f[li + 1]), state = f[length(f) - 1];
+			if (!match(mac, MAC_RE) || state == 'FAILED' || state == 'INCOMPLETE')
+				continue;
+
+			const n = res[mac] ??= { ip4: [], ip6: [], state: state };
+
+			if (fam == '4')
+				push(n.ip4, ip);
+			// 链路本地地址不会被转发，没必要建计数规则
+			else if (substr(ip, 0, 5) != 'fe80:')
+				push(n.ip6, ip);
+
+			if (ONLINE_STATES[state])
+				n.state = state;
+		}
+	}
+
+	return res;
+}
+
+// 返回 mac -> 主机名，来自 dnsmasq 租约文件
+function read_leases() {
+	const res = {};
+	const p = popen(`cat ${LEASES_FILE} 2>/dev/null`, 'r');
+	if (!p)
+		return res;
+
+	for (let line in split(p.read('all') || '', '\n')) {
+		const f = split(trim(line), /\s+/);
+		if (length(f) >= 4 && f[3] != '*')
+			res[lc(f[1])] = f[3];
+	}
+
+	p.close();
+	return res;
+}
+
+function get_dev(mac) {
+	return devs[mac] ??= {
+		mac: mac, hostname: '', ip4: [], ip6: [], state: '',
+		first_seen: time(), last_active: 0,
+		base_tx: 0, base_rx: 0, cur_tx: 0, cur_rx: 0,
+		prev_tx: 0, prev_rx: 0, tx_rate: 0, rx_rate: 0, sampled: false,
+		hist_tx: [], hist_rx: []
+	};
+}
+
+// 当前计数并入基数；重建 nft 表前调用，保证累计值不回退
+function fold_counters() {
+	for (let mac, d in devs) {
+		d.base_tx += d.cur_tx;
+		d.base_rx += d.cur_rx;
+		d.cur_tx = 0;
+		d.cur_rx = 0;
+	}
+}
+
+function counter_name(dir, mac) {
+	return dir + '_' + replace(mac, /:/g, '');
+}
+
+function setup_table() {
+	fold_counters();
+	run(`nft delete table ${TABLE} 2>/dev/null`);
+
+	// 优先级比 fw4 的 filter 稍早，黑名单在 fw4 放行 established 之前生效
+	// 计数用“地址 -> 具名计数器”的 map：每个包固定 3 次哈希查找，开销不随设备数增长；
+	// 查不到的地址该条规则直接跳过，不影响放行
+	table_ok = nft_apply(`
+table ${TABLE} {
+	set blocked { type ether_addr; }
+	set blocked4 { type ipv4_addr; }
+	set blocked6 { type ipv6_addr; }
+	map tx { type ether_addr : counter; }
+	map rx4 { type ipv4_addr : counter; }
+	map rx6 { type ipv6_addr : counter; }
+	chain forward {
+		type filter hook forward priority filter - 5; policy accept;
+		ether saddr @blocked counter drop
+		ip daddr @blocked4 counter drop
+		ip6 daddr @blocked6 counter drop
+		counter name ether saddr map @tx
+		counter name ip daddr map @rx4
+		counter name ip6 daddr map @rx6
+	}
+}
+`);
+
+	counters = {};
+	map_sig = null;
+	block_sig = null;
+	blocked_ips = {};
+	return table_ok;
+}
+
+// 读取具名计数器写入 cur_tx/cur_rx；读不到说明表被外部删掉，返回 false
+function read_counters() {
+	const out = run(`nft -j list counters table ${TABLE} 2>/dev/null`);
+	if (out == null)
+		return false;
+
+	let doc;
+	try {
+		doc = json(out);
+	} catch (e) {
+		return false;
+	}
+
+	for (let item in doc?.nftables || []) {
+		const c = item.counter;
+		const m = c ? match(c.name, /^(tx|rx)_([0-9a-f]{12})$/) : null;
+		if (!m)
+			continue;
+
+		const h = m[2];
+		const mac = join(':', [ substr(h, 0, 2), substr(h, 2, 2), substr(h, 4, 2), substr(h, 6, 2), substr(h, 8, 2), substr(h, 10, 2) ]);
+		const d = devs[mac];
+		if (d) {
+			if (m[1] == 'tx')
+				d.cur_tx = c.bytes;
+			else
+				d.cur_rx = c.bytes;
+		}
+	}
+
+	return true;
+}
+
+// 计数器对象一直保留，只替换 map 元素，所以设备 IP 变化时累计值不会被清零
+function sync_maps() {
+	const el_tx = [], el_rx4 = [], el_rx6 = [], fresh = [];
+	const seen_ip = {};
+	let script = '';
+
+	for (let mac in sort(keys(devs))) {
+		const d = devs[mac];
+		if (!d.state)
+			continue;
+
+		if (!counters[mac]) {
+			push(fresh, mac);
+			script += `add counter ${TABLE} ${counter_name('tx', mac)}\nadd counter ${TABLE} ${counter_name('rx', mac)}\n`;
+		}
+
+		push(el_tx, `${mac} : "${counter_name('tx', mac)}"`);
+
+		// 地址刚被重新分配时，旧设备的邻居条目可能还没过期，同一个 IP 只算给第一个设备，否则 nft 会因键重复报错
+		for (let ip in d.ip4) {
+			if (seen_ip[ip])
+				continue;
+			seen_ip[ip] = true;
+			push(el_rx4, `${ip} : "${counter_name('rx', mac)}"`);
+		}
+		for (let ip in d.ip6) {
+			if (seen_ip[ip])
+				continue;
+			seen_ip[ip] = true;
+			push(el_rx6, `${ip} : "${counter_name('rx', mac)}"`);
+		}
+	}
+
+	const gone = filter(keys(counters), (mac) => !devs[mac]);
+	const sig = join(',', el_tx) + '|' + join(',', el_rx4) + '|' + join(',', el_rx6);
+	if (sig == map_sig && !length(gone))
+		return;
+
+	script += `flush map ${TABLE} tx\nflush map ${TABLE} rx4\nflush map ${TABLE} rx6\n`;
+	if (length(el_tx))  script += `add element ${TABLE} tx { ${join(', ', el_tx)} }\n`;
+	if (length(el_rx4)) script += `add element ${TABLE} rx4 { ${join(', ', el_rx4)} }\n`;
+	if (length(el_rx6)) script += `add element ${TABLE} rx6 { ${join(', ', el_rx6)} }\n`;
+
+	// 被遗忘设备的计数器要等 map 不再引用后才能删除
+	for (let mac in gone)
+		script += `delete counter ${TABLE} ${counter_name('tx', mac)}\ndelete counter ${TABLE} ${counter_name('rx', mac)}\n`;
+
+	if (!nft_apply(script)) {
+		table_ok = false;
+		return;
+	}
+
+	map_sig = sig;
+	for (let mac in fresh)
+		counters[mac] = true;
+	for (let mac in gone)
+		delete counters[mac];
+}
+
+function sync_blocked(cfg) {
+	const macs = [], ip4 = [], ip6 = [];
+
+	for (let mac in sort(keys(cfg.devices))) {
+		if (!cfg.devices[mac].blocked)
+			continue;
+
+		push(macs, mac);
+		const d = devs[mac];
+		if (d) {
+			for (let ip in d.ip4) push(ip4, ip);
+			for (let ip in d.ip6) push(ip6, ip);
+		}
+	}
+
+	const sig = join(',', macs) + '|' + join(',', ip4) + '|' + join(',', ip6);
+	if (sig == block_sig)
+		return;
+
+	let script = `flush set ${TABLE} blocked\nflush set ${TABLE} blocked4\nflush set ${TABLE} blocked6\n`;
+	if (length(macs)) script += `add element ${TABLE} blocked { ${join(', ', macs)} }\n`;
+	if (length(ip4))  script += `add element ${TABLE} blocked4 { ${join(', ', ip4)} }\n`;
+	if (length(ip6))  script += `add element ${TABLE} blocked6 { ${join(', ', ip6)} }\n`;
+
+	if (!nft_apply(script)) {
+		table_ok = false;
+		return;
+	}
+	block_sig = sig;
+
+	// 已建立的连接可能已被卸载，绕过 forward 钩子；删掉 conntrack 条目才能立即断网
+	const now_blocked = {};
+	for (let ip in [ ...ip4, ...ip6 ]) {
+		now_blocked[ip] = true;
+		if (!blocked_ips[ip] && access(CONNTRACK_BIN, 'x')) {
+			run(`${CONNTRACK_BIN} -D -s ${ip} >/dev/null 2>&1`);
+			run(`${CONNTRACK_BIN} -D -d ${ip} >/dev/null 2>&1`);
+		}
+	}
+	blocked_ips = now_blocked;
+}
+
+function push_hist(arr, v, max) {
+	push(arr, v);
+	while (length(arr) > max)
+		shift(arr);
+}
+
+function sample(cfg, dt) {
+	const ts = time();
+	let sum_tx = 0, sum_rx = 0;
+
+	for (let mac, d in devs) {
+		const tx = d.base_tx + d.cur_tx, rx = d.base_rx + d.cur_rx;
+
+		// 第一次采样没有上一次的基准，速率记 0，避免把启动前的计数算成一个尖峰
+		const ok = d.sampled && dt > 0;
+		d.tx_rate = (ok && tx >= d.prev_tx) ? int((tx - d.prev_tx) / dt) : 0;
+		d.rx_rate = (ok && rx >= d.prev_rx) ? int((rx - d.prev_rx) / dt) : 0;
+		d.sampled = true;
+		d.prev_tx = tx;
+		d.prev_rx = rx;
+
+		if (d.tx_rate > 0 || d.rx_rate > 0 || ONLINE_STATES[d.state])
+			d.last_active = ts;
+
+		push_hist(d.hist_tx, d.tx_rate, cfg.history);
+		push_hist(d.hist_rx, d.rx_rate, cfg.history);
+
+		sum_tx += d.tx_rate;
+		sum_rx += d.rx_rate;
+	}
+
+	total.tx_rate = sum_tx;
+	total.rx_rate = sum_rx;
+	push_hist(total.hist_tx, sum_tx, cfg.history);
+	push_hist(total.hist_rx, sum_rx, cfg.history);
+	push_hist(hist_ts, ts, cfg.history);
+}
+
+function dev_state(d, ts) {
+	if (ONLINE_STATES[d.state] || (d.last_active && ts - d.last_active < ACTIVE_WINDOW))
+		return 'online';
+	return d.state ? 'idle' : 'offline';
+}
+
+function write_json(path, obj) {
+	const tmp = path + '.tmp';
+	if (writefile(tmp, sprintf('%J', obj)) != null)
+		rename(tmp, path);
+}
+
+function write_output(cfg) {
+	const ts = time();
+	const list = [];
+	const hist = { _total: { tx: total.hist_tx, rx: total.hist_rx } };
+
+	for (let mac, d in devs) {
+		const c = cfg.devices[mac] || {};
+		const pad = length(hist_ts) - length(d.hist_tx);
+
+		push(list, {
+			mac: mac,
+			name: c.name || '',
+			hostname: d.hostname,
+			ip4: d.ip4,
+			ip6: d.ip6,
+			state: dev_state(d, ts),
+			blocked: !!c.blocked,
+			known: !!cfg.devices[mac],
+			first_seen: d.first_seen,
+			last_active: d.last_active,
+			tx_bytes: d.base_tx + d.cur_tx,
+			rx_bytes: d.base_rx + d.cur_rx,
+			tx_rate: d.tx_rate,
+			rx_rate: d.rx_rate
+		});
+
+		// 新出现的设备历史较短，左侧补 0，与 ts 数组对齐
+		const zeros = [];
+		for (let i = 0; i < pad; i++)
+			push(zeros, 0);
+		hist[mac] = { tx: [ ...zeros, ...d.hist_tx ], rx: [ ...zeros, ...d.hist_rx ] };
+	}
+
+	// 配置过但本次运行还没出现的设备也列出来，方便改名和解除拉黑
+	for (let mac, c in cfg.devices) {
+		if (devs[mac])
+			continue;
+		push(list, {
+			mac: mac, name: c.name, hostname: '', ip4: [], ip6: [],
+			state: 'offline', blocked: c.blocked, known: true,
+			first_seen: 0, last_active: 0,
+			tx_bytes: 0, rx_bytes: 0, tx_rate: 0, rx_rate: 0
+		});
+	}
+
+	write_json(STATS_FILE, {
+		ts: ts,
+		iface: cfg.iface,
+		interval: cfg.interval,
+		offload: cfg.offload,
+		table_ok: table_ok,
+		total: { tx_rate: total.tx_rate, rx_rate: total.rx_rate },
+		devices: list
+	});
+
+	write_json(HISTORY_FILE, { interval: cfg.interval, ts: hist_ts, devices: hist });
+}
+
+function step(cfg, dt) {
+	if (cfg.iface != cur_iface) {
+		cur_iface = cfg.iface;
+		table_ok = false;
+	}
+
+	if (!table_ok)
+		setup_table();
+
+	const neigh = read_neigh(cfg.iface);
+	const leases = read_leases();
+
+	for (let mac, d in devs) {
+		d.state = '';
+		d.ip4 = [];
+		d.ip6 = [];
+	}
+
+	for (let mac, n in neigh) {
+		const d = get_dev(mac);
+		d.state = n.state;
+		d.ip4 = n.ip4;
+		d.ip6 = n.ip6;
+	}
+
+	const ts = time();
+	for (let mac, d in devs) {
+		if (leases[mac])
+			d.hostname = leases[mac];
+		else if (!d.state && !cfg.devices[mac] && ts - (d.last_active || d.first_seen) > FORGET_AFTER)
+			delete devs[mac];
+	}
+
+	if (table_ok && !read_counters())
+		table_ok = false;
+
+	sample(cfg, dt);
+
+	if (table_ok) sync_maps();
+	if (table_ok) sync_blocked(cfg);
+
+	write_output(cfg);
+}
+
+mkdir(RUN_DIR);
+
+let last = now_mono();
+while (true) {
+	const cfg = load_config();
+	const t = now_mono();
+
+	step(cfg, t - last);
+	last = t;
+
+	sleep(cfg.interval * 1000);
+}

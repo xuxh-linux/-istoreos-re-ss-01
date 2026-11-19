@@ -14,21 +14,45 @@
 | OpenWrt 标识 | `jdcloud_re-ss-01` |
 | 目标子架构 | `qualcommax / ipq60xx` |
 
-## 内置软件
+## 两个版本
 
+每次构建同时出两个版本，各自发一个 Release（tag 以 `-full` / `-pure` 结尾）：
+
+| 版本 | 预装内容 | 适合 |
+| --- | --- | --- |
+| 完整版 `full` | 下面「内置软件」里的全部：代理插件、4G、Samba / NFS / DLNA、adblock、usteer 等 | 刷机即用 |
+| 纯净版 `pure` | 只有 iStoreOS 首页 / 网络向导 / 应用商店、基础 LuCI、中文、终端、devmon（设备管理、流量监控、抓包） | 想自己从 iStore 挑应用 |
+
+纯净版说明：
+
+- 本固件的内核是自编的，软件源里的内核模块装不上（内核哈希对不上），所以纯净版仍把 Docker、透明代理（tproxy / socket / TUN）、WireGuard、SQM / eqos、常见文件系统和 USB 有线网卡要用的内核模块编进固件，从 iStore 装 Docker、PassWall、zerotier 这类应用不受影响；
+- 不带 daed 用的 BTF 调试信息，镜像比完整版小得多；4G 模块驱动也不带；
+- 卡死诊断、zram、中断分核、默认设置和完整版相同（usteer 不在纯净版里）。
+
+两个版本的包清单在 [`.github/configs/`](.github/configs/)，本地编译：
+
+```sh
+cp .github/configs/re-ss-01-pure.seed .config   # 完整版换成 re-ss-01-full.seed
+make defconfig && make -j$(nproc)
+```
+
+## 内置软件（完整版）
+
+- **设备管理 / 抓包**：luci-app-devmon（自研，设备列表、流量监控、tcpdump 抓包），两个版本都有；
 - **代理插件（预装，默认全部关闭，同一时间只开一个）**：大鹅 daed + luci-app-daede、PassWall（Xray 26.7.28）、HomeProxy、mosdns；
 - **eBPF / BTF 内核支持**：已开启 BTF、XDP、BPF Events、CGROUPS，并内置 daed 所需内核模块（kmod-sched-core / kmod-sched-bpf / kmod-veth / kmod-xdp-sockets-diag）；
 - **TUN/TAP 虚拟网卡（kmod-tun）**：TUN 模式代理可直接使用；
 - **无线**：完整版 wpad（802.11k/v）+ usteer 双频引导，relayd + luci-proto-relay 中继桥接；
 - **zram-swap**：默认开启压缩交换（zstd），降低小内存机型 OOM 概率；
-- **中断分核**：WiFi / 有线网卡中断开机自动分散到 4 个核心，避免全部压在 CPU0。
+- **中断分核**：WiFi / 有线网卡中断开机自动分散到 4 个核心，避免全部压在 CPU0；
+- **卡死诊断**：开启软 / 硬锁死和 hung task 检测，内核锁死时自动 panic 重启，不用再拔电；ramoops 保留重启前的内核日志，重启后在 `/sys/fs/pstore` 查看（断电会清空）。
 
 ## 默认设置
 
 | 项目 | 默认值 |
 | --- | --- |
-| 后台地址 | `http://192.168.6.1`（LAN DHCP 已开启） |
-| WiFi | `404 Not Found`（2.4G/5G 同名，usteer 自动选频段），密码 `12345678`，首次启动自动开启 |
+| 后台地址 | `http://10.0.0.1`（LAN DHCP 已开启） |
+| WiFi | `404 Not Found`（2.4G/5G 同名，usteer 自动选频段），密码 `12345678`，首次启动自动开启；5G 默认 149 信道（国内 36 信道限 23 dBm，149 可到本机上限 27 dBm） |
 | 默认关闭的服务 | 软件流量卸载（会绕过 dae 的 eBPF）、mwan3（单 WAN 无意义）、frpc、haproxy、tailscale |
 | 广告过滤 | adblock 走 dnsmasq，规则源 anti_ad（约 10 万条），WAN 上线后自动拉取 |
 | watchcat | 6 小时 ping 不通 `223.5.5.5`、`119.29.29.29` 才重启 |
@@ -79,7 +103,7 @@
 
 ## 大鹅 daed 配置要点
 
-daed 已预装，在 `服务` 菜单或 `http://192.168.6.1:2023` 打开面板，首次进入先创建账号，然后导入订阅、新建分组（把订阅加进去）、点右上角运行。以下几项不按此设置会出问题：
+daed 已预装，在 `服务` 菜单或 `http://10.0.0.1:2023` 打开面板，首次进入先创建账号，然后导入订阅、新建分组（把订阅加进去）、点右上角运行。以下几项不按此设置会出问题：
 
 1. **全局配置 → LAN 接口选 `br-lan`**（有线和 WiFi 都桥接在里面；只选 lan1~lan3 时 WiFi 设备不走代理）。
 2. **全局配置 → 拨号模式选 `domain+`**。默认的 `domain` 只对经 dae 解析的 IP 改用域名拨号，路由器本机等 DNS 不经过 dae 的流量会拿被污染的 IP 去拨号，表现为 TLS 握手中途断开。

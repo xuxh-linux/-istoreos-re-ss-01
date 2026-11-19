@@ -1,0 +1,146 @@
+# 京东云亚瑟 AX1800 Pro（RE-SS-01）纯净版种子配置
+#
+# 只预装 iStoreOS 界面（首页 / 网络向导 / 应用商店）、基础 LuCI、终端和 devmon，
+# 其余应用刷机后从 iStore 按需安装。
+# 内核是自编的，软件源里的 kmod 装不上（内核哈希对不上），所以 Docker、
+# PassWall、zerotier、SQM 这类应用要用的内核模块和内核选项仍然编进固件，
+# 后装这些应用不受影响。
+# 和完整版相比去掉了 daed 用的 BTF 调试信息，内核和镜像都小很多。
+#
+# 用法：cp .github/configs/re-ss-01-pure.seed .config && make defconfig
+
+CONFIG_TARGET_qualcommax=y
+CONFIG_TARGET_qualcommax_ipq60xx=y
+CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_jdcloud_re-ss-01=y
+CONFIG_TARGET_ROOTFS_SQUASHFS=y
+# CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+CONFIG_PACKAGE_zram-swap=y
+CONFIG_KERNEL_ZRAM_BACKEND_LZO=y
+CONFIG_KERNEL_ZRAM_BACKEND_ZSTD=y
+CONFIG_KERNEL_ZRAM_DEF_COMP_ZSTD=y
+CONFIG_KERNEL_BUILD_USER="natserver"
+CONFIG_KERNEL_BUILD_DOMAIN="istoreos"
+
+# ===============================================================
+# A. iStoreOS 界面栈（首页 / 网络向导 / 应用商店）
+# quickstart 的依赖链缺一环，defconfig 就会静默丢掉整条链，所以逐项列出
+# ===============================================================
+CONFIG_PACKAGE_luci-app-store=y
+CONFIG_PACKAGE_quickstart=y
+CONFIG_PACKAGE_luci-app-quickstart=y
+CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y
+CONFIG_PACKAGE_taskd=y
+CONFIG_PACKAGE_luci-lib-taskd=y
+CONFIG_PACKAGE_luci-lib-xterm=y
+CONFIG_PACKAGE_shadow-utils=y
+CONFIG_PACKAGE_shadow-useradd=y
+CONFIG_PACKAGE_mount-utils=y
+CONFIG_PACKAGE_block-mount=y
+CONFIG_PACKAGE_lsblk=y
+CONFIG_PACKAGE_e2fsprogs=y
+CONFIG_PACKAGE_parted=y
+CONFIG_PACKAGE_smartmontools=y
+CONFIG_PACKAGE_smartd=y
+CONFIG_PACKAGE_smartmontools-drivedb=y
+CONFIG_PACKAGE_mdadm=y
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_bash=y
+
+# ===============================================================
+# B. 外观、基础 LuCI、终端、中文
+# 不选 luci-mod-dashboard：它会在菜单里多出一个和「首页」重复的「主页」
+# ===============================================================
+CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_luci-app-argon-config=y
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-app-package-manager=y
+CONFIG_PACKAGE_luci-compat=y
+CONFIG_PACKAGE_ttyd=y
+CONFIG_PACKAGE_luci-app-ttyd=y
+CONFIG_LUCI_LANG_zh_Hans=y
+CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
+
+# ===============================================================
+# C. 设备管理 / 流量监控 / 抓包（自研 luci-app-devmon，依赖 tcpdump）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-devmon=y
+CONFIG_PACKAGE_tcpdump=y
+
+# ===============================================================
+# D. 常用命令行工具
+# ===============================================================
+CONFIG_PACKAGE_curl=y
+CONFIG_PACKAGE_tar=y
+CONFIG_PACKAGE_gzip=y
+CONFIG_PACKAGE_xz-utils=y
+CONFIG_PACKAGE_unzip=y
+CONFIG_PACKAGE_ca-bundle=y
+CONFIG_PACKAGE_blkid=y
+CONFIG_PACKAGE_zoneinfo-asia=y
+
+# ===============================================================
+# E. 内核模块：后装应用要用的都提前编进来
+# ===============================================================
+# 存储：U 盘 / 硬盘 / 常见文件系统 / 网络挂载
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_kmod-fs-vfat=y
+CONFIG_PACKAGE_kmod-fs-exfat=y
+CONFIG_PACKAGE_kmod-fs-f2fs=y
+CONFIG_PACKAGE_kmod-fs-ext4=y
+CONFIG_PACKAGE_kmod-fs-ntfs3=y
+CONFIG_PACKAGE_kmod-fs-btrfs=y
+CONFIG_PACKAGE_kmod-fs-xfs=y
+CONFIG_PACKAGE_kmod-fs-cifs=y
+CONFIG_PACKAGE_kmod-fs-nfs=y
+CONFIG_PACKAGE_kmod-fuse=y
+CONFIG_PACKAGE_ntfs3-mount=y
+# Docker（iStore 里的 dockerd 依赖这些）
+CONFIG_PACKAGE_kmod-veth=y
+CONFIG_PACKAGE_kmod-br-netfilter=y
+CONFIG_PACKAGE_kmod-ipt-nat=y
+CONFIG_PACKAGE_kmod-ipt-nat6=y
+CONFIG_PACKAGE_kmod-ipt-physdev=y
+CONFIG_PACKAGE_kmod-ipt-extra=y
+CONFIG_PACKAGE_kmod-nf-ipvs=y
+CONFIG_PACKAGE_kmod-macvlan=y
+CONFIG_PACKAGE_kmod-dummy=y
+CONFIG_PACKAGE_kmod-nf-conntrack-netlink=y
+# 透明代理（PassWall / OpenClash / sing-box 等）和 TUN 模式、zerotier
+CONFIG_PACKAGE_kmod-tun=y
+CONFIG_PACKAGE_kmod-nft-tproxy=y
+CONFIG_PACKAGE_kmod-nft-socket=y
+CONFIG_PACKAGE_kmod-nft-queue=y
+CONFIG_PACKAGE_kmod-nft-compat=y
+CONFIG_PACKAGE_kmod-ipt-tproxy=y
+CONFIG_PACKAGE_kmod-ipt-ipset=y
+CONFIG_PACKAGE_kmod-ipt-conntrack-extra=y
+CONFIG_PACKAGE_kmod-inet-diag=y
+CONFIG_PACKAGE_kmod-wireguard=y
+# 限速 / SQM / eqos
+CONFIG_PACKAGE_kmod-sched=y
+CONFIG_PACKAGE_kmod-sched-core=y
+CONFIG_PACKAGE_kmod-sched-cake=y
+CONFIG_PACKAGE_kmod-ifb=y
+CONFIG_PACKAGE_kmod-tcp-bbr=y
+# USB 有线网卡（RTL8152/8153、AX88179）
+CONFIG_PACKAGE_kmod-usb-net-rtl8152=y
+CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=y
+
+# ===============================================================
+# F. 卡死诊断：锁死检测 + ramoops
+# 锁死后 panic 重启（sysctl 见 base-files 的 20-lockup-panic.conf），
+# ramoops 把重启前的内核日志留在内存里，热重启后在 /sys/fs/pstore 读取。
+# 这几项依赖 KERNEL_DEBUG_KERNEL，它没有单独的开关，只能由 KERNEL_DEBUG_INFO 选上。
+# 调试信息在打包时会被 strip，不进镜像；让镜像变大的是 BTF，纯净版不开
+# ===============================================================
+CONFIG_KERNEL_DEBUG_INFO=y
+# CONFIG_KERNEL_DEBUG_INFO_BTF is not set
+CONFIG_KERNEL_SOFTLOCKUP_DETECTOR=y
+CONFIG_KERNEL_HARDLOCKUP_DETECTOR=y
+CONFIG_KERNEL_DETECT_HUNG_TASK=y
+CONFIG_PACKAGE_kmod-ramoops=y

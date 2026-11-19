@@ -1,0 +1,55 @@
+{
+	"admin/network/devmon": {
+		"title": "Device Monitor",
+		"order": 70,
+		"action": {
+			"type": "alias",
+			"path": "admin/network/devmon/devices"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-devmon"
+			]
+		}
+	},
+	"admin/network/devmon/devices": {
+		"title": "Devices",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "devmon/devices"
+		}
+	},
+	"admin/network/devmon/traffic": {
+		"title": "Traffic",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "devmon/traffic"
+		}
+	},
+	"admin/network/devmon/capture": {
+		"title": "Packet Capture",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "devmon/capture"
+		}
+	},
+	"admin/network/devmon/settings": {
+		"title": "Settings",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "devmon/settings"
+		}
+	},
+	"admin/network/devmon/dashboard": {
+		"title": "Dashboard",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "devmon/dashboard"
+		}
+	}
+}

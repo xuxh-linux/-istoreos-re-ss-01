@@ -1,0 +1,44 @@
+{
+	"luci-app-devmon": {
+		"description": "Grant access to device monitor, traffic statistics and packet capture",
+		"read": {
+			"ubus": {
+				"luci.devmon": [
+					"getStats",
+					"getHistory",
+					"captureList",
+					"capturePreview",
+					"captureTail"
+				],
+				"uci": [
+					"get"
+				]
+			},
+			"file": {
+				"/tmp/devmon/cap/*": [
+					"read"
+				]
+			},
+			"uci": [
+				"devmon"
+			]
+		},
+		"write": {
+			"ubus": {
+				"luci.devmon": [
+					"setDevice",
+					"captureStart",
+					"captureStop",
+					"captureDelete"
+				],
+				"uci": [
+					"set",
+					"commit"
+				]
+			},
+			"uci": [
+				"devmon"
+			]
+		}
+	}
+}

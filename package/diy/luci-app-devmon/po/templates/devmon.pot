@@ -1,0 +1,433 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:31
+msgid "%d s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:142
+msgid "-- select device --"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:179
+msgid "0 means run until stopped or the size limit is reached."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:161
+#: htdocs/luci-static/resources/view/devmon/devices.js:176
+msgid "Actions"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:27
+msgid "All devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:143
+msgid "Block"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:40
+msgid "Block internet access"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:63
+msgid "Block internet access of %s?"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:26
+#: htdocs/luci-static/resources/view/devmon/devices.js:107
+msgid "Blocked"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:44
+msgid "Cancel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:144
+msgid "Capture"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:39
+msgid "Capture size limit (MB)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:46
+msgid "Capture started, see the list below"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:178
+msgid ""
+"Capture stops when the file reaches this size. Also limited by the Settings "
+"tab and half of the free RAM disk."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:189
+msgid "Captures"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:171
+msgid ""
+"Captures all packets sent or received by one device (matched by MAC address) "
+"into a pcap file in RAM. Files are lost on reboot; download them for "
+"analysis in Wireshark."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:92
+msgid "Capturing"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:138
+msgid "Chart"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:83
+#: htdocs/luci-static/resources/view/devmon/devices.js:74
+msgid "Close"
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:48
+msgid "Dashboard"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:122
+msgid "Delete"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:56
+msgid "Delete this capture file?"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:155
+#: htdocs/luci-static/resources/view/devmon/capture.js:175
+#: htdocs/luci-static/resources/view/devmon/devices.js:170
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Device"
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:3
+msgid "Device Monitor"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:18
+msgid "Device Monitor Dashboard"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:185
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:16
+msgid "Devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:186
+msgid ""
+"Devices seen on the LAN, with realtime rates and totals counted since the "
+"service started."
+msgstr ""
+
+#: htdocs/luci-static/resources/devmon/common.js:116
+#: htdocs/luci-static/resources/devmon/common.js:227
+#: htdocs/luci-static/resources/view/devmon/capture.js:121
+#: htdocs/luci-static/resources/view/devmon/devices.js:106
+#: htdocs/luci-static/resources/view/devmon/devices.js:174
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Download"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:75
+msgid "Download failed: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:41
+msgid ""
+"Drops forwarded traffic of this device; LAN access to the router itself is "
+"kept."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:158
+msgid "Duration"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:139
+msgid "Edit"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:34
+msgid "Edit device"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:18
+msgid "Enable service"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:95
+msgid "Error"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:177
+msgid "Extra filter"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:57
+msgid "Failed to save: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:44
+#: htdocs/luci-static/resources/view/devmon/capture.js:48
+msgid "Failed to start capture: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:162
+msgid "Filter by name, IP or MAC"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:96
+msgid "Finished"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:81
+msgid ""
+"First 200 packets, decoded by tcpdump on the router. Download the file and "
+"open it in Wireshark for full analysis."
+msgstr ""
+
+#: htdocs/luci-static/resources/devmon/common.js:345
+msgid ""
+"Flow offloading is enabled in the firewall. Offloaded traffic bypasses the "
+"counters, so rates will be lower than real. Disable software/hardware "
+"offloading for accurate numbers."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:89
+msgid ""
+"Forwarded traffic between LAN devices and other networks. The chart shows "
+"the most recent samples kept by the service."
+msgstr ""
+
+#: root/usr/share/rpcd/acl.d/luci-app-devmon.json:3
+msgid "Grant access to device monitor, traffic statistics and packet capture"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:191
+msgid "Hide offline devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:34
+msgid "History samples"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:171
+msgid "IP address"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+msgid "Idle"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:176
+msgid "Interface"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:156
+msgid "Interface / filter"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:23
+msgid "LAN interface"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:172
+msgid "MAC address"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:179
+msgid "Max duration (s)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:178
+msgid "Max file size (MB)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:36
+msgid "Name"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:24
+msgid "Network device whose neighbours are tracked, normally the LAN bridge."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:174
+msgid "New capture"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:47
+msgid "No active traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:127
+msgid "No captures yet"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:148
+msgid "No devices found"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:82
+msgid "No packets captured yet"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:59
+msgid "No traffic recorded yet"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:35
+msgid "Number of samples kept for each realtime chart (10-1800)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:144
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+msgid "Offline"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+#: htdocs/luci-static/resources/view/devmon/devices.js:104
+msgid "Online"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:20
+msgid "Open dashboard"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:177
+msgid ""
+"Optional tcpdump/BPF expression, combined with the device MAC using \"and\"."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:170
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:32
+msgid "Packet Capture"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:80
+msgid "Packet preview"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:37
+msgid "Please select a device"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:120
+msgid "Preview"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:72
+msgid "Realtime traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:30
+msgid "Sampling interval"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:48
+msgid "Save"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:12
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:40
+msgid "Settings"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:92
+msgid "Show"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:159
+msgid "Size"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:185
+msgid "Start capture"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:157
+msgid "Started"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:39
+msgid "Starting capture..."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:13
+msgid ""
+"Statistics are kept in memory and reset when the service restarts. Device "
+"names and block rules are saved permanently."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:160
+#: htdocs/luci-static/resources/view/devmon/devices.js:169
+msgid "Status"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:119
+msgid "Stop"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:19
+msgid ""
+"The dashboard opens in a new window. If your browser blocked the pop-up, "
+"click the button below."
+msgstr ""
+
+#: htdocs/luci-static/resources/devmon/common.js:343
+msgid ""
+"The devmon service is not running; statistics are not updated. Enable it on "
+"the Settings tab."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:95
+msgid "Top devices by current rate"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:96
+msgid "Top devices by total traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:175
+msgid "Total"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:88
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:24
+msgid "Traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:143
+msgid "Unblock"
+msgstr ""
+
+#: htdocs/luci-static/resources/devmon/common.js:115
+#: htdocs/luci-static/resources/devmon/common.js:226
+#: htdocs/luci-static/resources/view/devmon/devices.js:105
+#: htdocs/luci-static/resources/view/devmon/devices.js:173
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Upload"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:40
+msgid ""
+"Upper bound for a single capture file. Captures are stored in RAM (/tmp)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:176
+msgid "Usually the LAN bridge. Wi-Fi clients are also visible on the bridge."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:19
+msgid "When disabled, traffic counting and device blocking both stop."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:172
+msgid ""
+"tcpdump is not installed. Install the tcpdump package to use packet capture."
+msgstr ""

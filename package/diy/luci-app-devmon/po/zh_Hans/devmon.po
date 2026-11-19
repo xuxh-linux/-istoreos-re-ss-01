@@ -1,0 +1,410 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:31
+msgid "%d s"
+msgstr "%d 秒"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:142
+msgid "-- select device --"
+msgstr "-- 选择设备 --"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:179
+msgid "0 means run until stopped or the size limit is reached."
+msgstr "0 表示一直抓到手动停止或达到大小上限。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:161
+#: htdocs/luci-static/resources/view/devmon/devices.js:176
+msgid "Actions"
+msgstr "操作"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:27
+msgid "All devices"
+msgstr "全部设备"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:143
+msgid "Block"
+msgstr "拉黑"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:40
+msgid "Block internet access"
+msgstr "禁止上网"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:63
+msgid "Block internet access of %s?"
+msgstr "确定禁止 %s 上网吗？"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:26
+#: htdocs/luci-static/resources/view/devmon/devices.js:107
+msgid "Blocked"
+msgstr "已拉黑"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:44
+msgid "Cancel"
+msgstr "取消"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:144
+msgid "Capture"
+msgstr "抓包"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:39
+msgid "Capture size limit (MB)"
+msgstr "抓包文件上限 (MB)"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:46
+msgid "Capture started, see the list below"
+msgstr "已开始抓包，见下方列表"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:178
+msgid "Capture stops when the file reaches this size. Also limited by the Settings tab and half of the free RAM disk."
+msgstr "文件达到这个大小时自动停止。同时受设置页上限和内存盘剩余空间一半的限制。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:189
+msgid "Captures"
+msgstr "抓包记录"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:171
+msgid "Captures all packets sent or received by one device (matched by MAC address) into a pcap file in RAM. Files are lost on reboot; download them for analysis in Wireshark."
+msgstr "按 MAC 地址抓取单个设备收发的所有数据包，保存为内存中的 pcap 文件。重启后文件会丢失，请下载后用 Wireshark 分析。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:92
+msgid "Capturing"
+msgstr "抓包中"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:138
+msgid "Chart"
+msgstr "曲线"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:83
+#: htdocs/luci-static/resources/view/devmon/devices.js:74
+msgid "Close"
+msgstr "关闭"
+
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:48
+msgid "Dashboard"
+msgstr "独立仪表盘"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:122
+msgid "Delete"
+msgstr "删除"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:56
+msgid "Delete this capture file?"
+msgstr "确定删除这个抓包文件吗？"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:155
+#: htdocs/luci-static/resources/view/devmon/capture.js:175
+#: htdocs/luci-static/resources/view/devmon/devices.js:170
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Device"
+msgstr "设备"
+
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:3
+msgid "Device Monitor"
+msgstr "设备监控"
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:18
+msgid "Device Monitor Dashboard"
+msgstr "设备监控仪表盘"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:185
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:16
+msgid "Devices"
+msgstr "设备管理"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:186
+msgid "Devices seen on the LAN, with realtime rates and totals counted since the service started."
+msgstr "局域网内发现的设备，显示实时速率和服务启动以来的累计流量。"
+
+#: htdocs/luci-static/resources/devmon/common.js:116
+#: htdocs/luci-static/resources/devmon/common.js:227
+#: htdocs/luci-static/resources/view/devmon/capture.js:121
+#: htdocs/luci-static/resources/view/devmon/devices.js:106
+#: htdocs/luci-static/resources/view/devmon/devices.js:174
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Download"
+msgstr "下载"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:75
+msgid "Download failed: %s"
+msgstr "下载失败：%s"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:41
+msgid "Drops forwarded traffic of this device; LAN access to the router itself is kept."
+msgstr "丢弃该设备经路由器转发的流量；访问路由器本身不受影响。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:158
+msgid "Duration"
+msgstr "时长"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:139
+msgid "Edit"
+msgstr "编辑"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:34
+msgid "Edit device"
+msgstr "编辑设备"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:18
+msgid "Enable service"
+msgstr "启用服务"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:95
+msgid "Error"
+msgstr "错误"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:177
+msgid "Extra filter"
+msgstr "附加过滤条件"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:57
+msgid "Failed to save: %s"
+msgstr "保存失败：%s"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:44
+#: htdocs/luci-static/resources/view/devmon/capture.js:48
+msgid "Failed to start capture: %s"
+msgstr "启动抓包失败：%s"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:162
+msgid "Filter by name, IP or MAC"
+msgstr "按名称、IP 或 MAC 筛选"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:96
+msgid "Finished"
+msgstr "已完成"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:81
+msgid "First 200 packets, decoded by tcpdump on the router. Download the file and open it in Wireshark for full analysis."
+msgstr "路由器上用 tcpdump 解析的前 200 个数据包。完整分析请下载文件后用 Wireshark 打开。"
+
+#: htdocs/luci-static/resources/devmon/common.js:345
+msgid "Flow offloading is enabled in the firewall. Offloaded traffic bypasses the counters, so rates will be lower than real. Disable software/hardware offloading for accurate numbers."
+msgstr "防火墙开启了流量卸载，被卸载的连接不经过计数规则，显示的速率会偏低。需要准确数据请关闭软件/硬件流量卸载。"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:89
+msgid "Forwarded traffic between LAN devices and other networks. The chart shows the most recent samples kept by the service."
+msgstr "局域网设备与其他网络之间的转发流量。曲线显示服务保留的最近采样。"
+
+#: root/usr/share/rpcd/acl.d/luci-app-devmon.json:3
+msgid "Grant access to device monitor, traffic statistics and packet capture"
+msgstr "授予访问设备监控、流量统计和抓包的权限"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:191
+msgid "Hide offline devices"
+msgstr "隐藏离线设备"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:34
+msgid "History samples"
+msgstr "历史采样点数"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:171
+msgid "IP address"
+msgstr "IP 地址"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+msgid "Idle"
+msgstr "空闲"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:176
+msgid "Interface"
+msgstr "接口"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:156
+msgid "Interface / filter"
+msgstr "接口 / 过滤条件"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:23
+msgid "LAN interface"
+msgstr "LAN 接口"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:172
+msgid "MAC address"
+msgstr "MAC 地址"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:179
+msgid "Max duration (s)"
+msgstr "最长时长 (秒)"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:178
+msgid "Max file size (MB)"
+msgstr "文件大小上限 (MB)"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:36
+msgid "Name"
+msgstr "名称"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:24
+msgid "Network device whose neighbours are tracked, normally the LAN bridge."
+msgstr "用来发现设备的网络接口，通常是 LAN 网桥。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:174
+msgid "New capture"
+msgstr "新建抓包"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:47
+msgid "No active traffic"
+msgstr "当前没有流量"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:127
+msgid "No captures yet"
+msgstr "暂无抓包记录"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:148
+msgid "No devices found"
+msgstr "没有发现设备"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:82
+msgid "No packets captured yet"
+msgstr "还没有抓到数据包"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:59
+msgid "No traffic recorded yet"
+msgstr "暂无流量记录"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:35
+msgid "Number of samples kept for each realtime chart (10-1800)."
+msgstr "每条实时曲线保留的采样点数 (10-1800)。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:144
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+msgid "Offline"
+msgstr "离线"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:19
+#: htdocs/luci-static/resources/view/devmon/devices.js:104
+msgid "Online"
+msgstr "在线"
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:20
+msgid "Open dashboard"
+msgstr "打开仪表盘"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:177
+msgid "Optional tcpdump/BPF expression, combined with the device MAC using \"and\"."
+msgstr "可选的 tcpdump/BPF 表达式，与设备 MAC 用 \"and\" 组合。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:170
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:32
+msgid "Packet Capture"
+msgstr "数据包抓取"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:80
+msgid "Packet preview"
+msgstr "数据包预览"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:37
+msgid "Please select a device"
+msgstr "请选择设备"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:120
+msgid "Preview"
+msgstr "预览"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:72
+msgid "Realtime traffic"
+msgstr "实时流量"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:30
+msgid "Sampling interval"
+msgstr "采样间隔"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:48
+msgid "Save"
+msgstr "保存"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:12
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:40
+msgid "Settings"
+msgstr "设置"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:92
+msgid "Show"
+msgstr "显示"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:159
+msgid "Size"
+msgstr "大小"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:185
+msgid "Start capture"
+msgstr "开始抓包"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:157
+msgid "Started"
+msgstr "开始时间"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:39
+msgid "Starting capture..."
+msgstr "正在启动抓包…"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:13
+msgid "Statistics are kept in memory and reset when the service restarts. Device names and block rules are saved permanently."
+msgstr "统计数据保存在内存中，服务重启后清零。设备名称和拉黑规则会永久保存。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:160
+#: htdocs/luci-static/resources/view/devmon/devices.js:169
+msgid "Status"
+msgstr "状态"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:119
+msgid "Stop"
+msgstr "停止"
+
+#: htdocs/luci-static/resources/view/devmon/dashboard.js:19
+msgid "The dashboard opens in a new window. If your browser blocked the pop-up, click the button below."
+msgstr "仪表盘会在新窗口打开。如果浏览器拦截了弹窗，请点击下面的按钮。"
+
+#: htdocs/luci-static/resources/devmon/common.js:343
+msgid "The devmon service is not running; statistics are not updated. Enable it on the Settings tab."
+msgstr "devmon 服务未运行，统计数据不会更新。请在设置页启用。"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:95
+msgid "Top devices by current rate"
+msgstr "实时速率排行"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:96
+msgid "Top devices by total traffic"
+msgstr "累计流量排行"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:175
+msgid "Total"
+msgstr "累计"
+
+#: htdocs/luci-static/resources/view/devmon/traffic.js:88
+#: root/usr/share/luci/menu.d/luci-app-devmon.json:24
+msgid "Traffic"
+msgstr "流量监控"
+
+#: htdocs/luci-static/resources/view/devmon/devices.js:143
+msgid "Unblock"
+msgstr "解除拉黑"
+
+#: htdocs/luci-static/resources/devmon/common.js:115
+#: htdocs/luci-static/resources/devmon/common.js:226
+#: htdocs/luci-static/resources/view/devmon/devices.js:105
+#: htdocs/luci-static/resources/view/devmon/devices.js:173
+#: htdocs/luci-static/resources/view/devmon/traffic.js:81
+#: htdocs/luci-static/resources/view/devmon/traffic.js:82
+msgid "Upload"
+msgstr "上传"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:40
+msgid "Upper bound for a single capture file. Captures are stored in RAM (/tmp)."
+msgstr "单个抓包文件的上限。抓包文件保存在内存 (/tmp) 中。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:176
+msgid "Usually the LAN bridge. Wi-Fi clients are also visible on the bridge."
+msgstr "通常选 LAN 网桥，无线客户端的流量也经过网桥。"
+
+#: htdocs/luci-static/resources/view/devmon/settings.js:19
+msgid "When disabled, traffic counting and device blocking both stop."
+msgstr "关闭后流量统计和设备拉黑都会停止。"
+
+#: htdocs/luci-static/resources/view/devmon/capture.js:172
+msgid "tcpdump is not installed. Install the tcpdump package to use packet capture."
+msgstr "未安装 tcpdump，请安装 tcpdump 软件包后使用抓包功能。"

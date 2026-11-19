@@ -1,0 +1,337 @@
+#!/usr/bin/ucode
+// luci.devmon ubus 对象：读取 devmond 的统计结果，修改设备设置，管理抓包任务
+
+'use strict';
+
+import { readfile, writefile, lsdir, stat, unlink, mkdir, access, popen, open } from 'fs';
+import { cursor } from 'uci';
+
+const RUN_DIR      = '/tmp/devmon';
+const CAP_DIR      = RUN_DIR + '/cap';
+const STATS_FILE   = RUN_DIR + '/stats.json';
+const HISTORY_FILE = RUN_DIR + '/history.json';
+const CAPTURE_SH   = '/usr/libexec/devmon/capture.sh';
+// OpenWrt 的 tcpdump 包装在 /usr/bin，其他来源的可能在 /usr/sbin
+const TCPDUMP_PATHS = [ '/usr/bin/tcpdump', '/usr/sbin/tcpdump' ];
+
+const MAC_RE    = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/;
+const IFACE_RE  = /^[A-Za-z0-9._@-]{1,15}$/;
+const CAP_ID_RE = /^[0-9a-f]{12}_[0-9]+$/;
+// tcpdump 过滤表达式只放行 BPF 语法会用到的字符
+const FILTER_RE = regexp('^[]A-Za-z0-9 .:/_()!<>=&|[+*-]*$');
+const FILTER_MAX = 256;
+
+const MAX_RUNNING = 4;
+const PREVIEW_MAX_BYTES = 65536;
+// 单次 captureTail 最多返回的字节数，ubus 消息不宜过大
+const TAIL_MAX_BYTES = 65536;
+
+function shellquote(s) {
+	return "'" + replace(s, "'", "'\\''") + "'";
+}
+
+function read_json(path) {
+	const s = readfile(path);
+	if (s == null)
+		return null;
+	try {
+		return json(s);
+	} catch (e) {
+		return null;
+	}
+}
+
+function run(cmd) {
+	const p = popen(cmd, 'r');
+	if (!p)
+		return null;
+	const out = p.read('all');
+	p.close();
+	return out;
+}
+
+// 找不到时返回 null
+function tcpdump_bin() {
+	for (let p in TCPDUMP_PATHS)
+		if (access(p, 'x'))
+			return p;
+	return null;
+}
+
+function pid_alive(pid) {
+	return pid > 0 && access(`/proc/${pid}`);
+}
+
+function cap_pid(id) {
+	return int(trim(readfile(`${CAP_DIR}/${id}.pid`) || '0'));
+}
+
+function cap_info(id) {
+	const meta = read_json(`${CAP_DIR}/${id}.json`);
+	if (!meta)
+		return null;
+
+	const st = stat(`${CAP_DIR}/${id}.pcap`);
+	const tst = stat(`${CAP_DIR}/${id}.txt`);
+	meta.size = st ? st.size : 0;
+	meta.txt_size = tst ? tst.size : 0;
+	meta.running = pid_alive(cap_pid(id));
+	meta.ended = (!meta.running && st) ? st.mtime : null;
+
+	if (!meta.running) {
+		const log = trim(readfile(`${CAP_DIR}/${id}.log`) || '');
+		// tcpdump 正常结束也会往 stderr 打统计信息，只把真正的报错回传给页面
+		if (match(log, /(syntax error|No such device|permission|can't|ERROR|illegal)/i))
+			meta.error = log;
+	}
+
+	return meta;
+}
+
+function running_count() {
+	let n = 0;
+	for (let f in lsdir(CAP_DIR) || [])
+		if (match(f, /\.pid$/) && pid_alive(cap_pid(substr(f, 0, -4))))
+			n++;
+	return n;
+}
+
+function tmp_avail_kb() {
+	const out = run(`df -k ${CAP_DIR} 2>/dev/null | tail -n 1`) || '';
+	const f = split(trim(out), /\s+/);
+	return length(f) >= 4 ? int(f[3]) : 0;
+}
+
+function stop_capture(id) {
+	const pid = cap_pid(id);
+	if (pid_alive(pid))
+		run(`kill ${pid}`);
+}
+
+const methods = {
+	getStats: {
+		call: function() {
+			const st = read_json(STATS_FILE) || { devices: [] };
+			const interval = st.interval || 2;
+			const ifaces = filter(lsdir('/sys/class/net') || [], (n) => n != 'lo');
+
+			st.running = !!st.ts && (time() - st.ts) <= interval * 3 + 2;
+			st.tcpdump = !!tcpdump_bin();
+			st.ifaces = sort(ifaces);
+			return st;
+		}
+	},
+
+	getHistory: {
+		args: { mac: 'mac' },
+		call: function(req) {
+			const h = read_json(HISTORY_FILE) || { ts: [], devices: {} };
+			const mac = lc(req.args.mac || '');
+			const key = match(mac, MAC_RE) ? mac : '_total';
+
+			return {
+				interval: h.interval || 2,
+				ts: h.ts || [],
+				series: h.devices?.[key] || { tx: [], rx: [] }
+			};
+		}
+	},
+
+	setDevice: {
+		args: { mac: 'mac', name: 'name', blocked: false },
+		call: function(req) {
+			const mac = lc(req.args.mac || '');
+			if (!match(mac, MAC_RE))
+				return { error: 'invalid mac' };
+
+			const name = substr(replace(trim(req.args.name || ''), /[[:cntrl:]]/g, ''), 0, 64);
+			const blocked = !!req.args.blocked;
+			const sid = replace(mac, /:/g, '');
+			const c = cursor();
+
+			// 名字为空且未拉黑时删掉配置节，设备退回为自动发现的普通设备
+			if (name == '' && !blocked) {
+				c.delete('devmon', sid);
+			}
+			else {
+				c.set('devmon', sid, 'device');
+				c.set('devmon', sid, 'mac', mac);
+				c.set('devmon', sid, 'name', name);
+				c.set('devmon', sid, 'blocked', blocked ? '1' : '0');
+			}
+
+			c.commit('devmon');
+			return { result: true };
+		}
+	},
+
+	// rpcd 把整数默认值 8/16/64 当作 INT8/INT16/INT64 类型提示，其他值才是 INT32；
+	// 浏览器经 /ubus 传来的整数是 INT32，这里的整数默认值都不能取 8、16、64
+	captureStart: {
+		args: { mac: 'mac', iface: 'iface', filter: 'filter', max_mb: 32, duration: 60, name: 'name' },
+		call: function(req) {
+			const a = req.args;
+			const mac = lc(a.mac || '');
+			const iface = a.iface || cursor().get('devmon', 'main', 'iface') || 'br-lan';
+			const flt = trim(a.filter || '');
+			const duration = int(a.duration ?? 60);
+			const limit_mb = int(cursor().get('devmon', 'main', 'cap_max_mb') || 64);
+
+			if (!tcpdump_bin())
+				return { error: 'tcpdump is not installed' };
+			if (!match(mac, MAC_RE))
+				return { error: 'invalid mac' };
+			if (!match(iface, IFACE_RE) || !access(`/sys/class/net/${iface}`))
+				return { error: 'invalid interface' };
+			if (length(flt) > FILTER_MAX || !match(flt, FILTER_RE))
+				return { error: 'filter contains unsupported characters' };
+			if (duration < 0 || duration > 86400)
+				return { error: 'invalid duration' };
+
+			mkdir(RUN_DIR);
+			mkdir(CAP_DIR);
+
+			if (running_count() >= MAX_RUNNING)
+				return { error: 'too many running captures' };
+
+			// 抓包文件放在内存盘里，最多占用剩余空间的一半，防止把 /tmp 写满
+			let max_kb = int(a.max_mb ?? 32) * 1024;
+			if (max_kb <= 0 || max_kb > limit_mb * 1024)
+				max_kb = limit_mb * 1024;
+			const avail = tmp_avail_kb() / 2;
+			if (max_kb > avail)
+				max_kb = int(avail);
+			if (max_kb < 64)
+				return { error: 'not enough free space in /tmp' };
+
+			const id = sprintf('%s_%d', replace(mac, /:/g, ''), time());
+			if (access(`${CAP_DIR}/${id}.json`))
+				return { error: 'capture already started, retry in a second' };
+
+			writefile(`${CAP_DIR}/${id}.json`, sprintf('%J', {
+				id: id, mac: mac, name: substr(a.name || '', 0, 64), iface: iface,
+				filter: flt, max_kb: max_kb, duration: duration, started: time()
+			}));
+
+			const argv = map([ CAP_DIR, id, iface, mac, '' + max_kb, '' + duration, flt ], shellquote);
+			system(`setsid ${CAPTURE_SH} ${join(' ', argv)} </dev/null >/dev/null 2>&1 &`);
+
+			// 过滤表达式写错时 tcpdump 会立即退出，稍等一下把错误直接回给页面
+			sleep(500);
+			const info = cap_info(id);
+			if (info?.error) {
+				for (let ext in [ 'pcap', 'txt', 'json', 'log' ])
+					unlink(`${CAP_DIR}/${id}.${ext}`);
+				return { error: info.error };
+			}
+
+			return { id: id };
+		}
+	},
+
+	captureStop: {
+		args: { id: 'id' },
+		call: function(req) {
+			if (!match(req.args.id || '', CAP_ID_RE))
+				return { error: 'invalid id' };
+			stop_capture(req.args.id);
+			return { result: true };
+		}
+	},
+
+	captureDelete: {
+		args: { id: 'id' },
+		call: function(req) {
+			const id = req.args.id || '';
+			if (!match(id, CAP_ID_RE))
+				return { error: 'invalid id' };
+
+			stop_capture(id);
+			for (let ext in [ 'pcap', 'txt', 'json', 'log', 'pid' ])
+				unlink(`${CAP_DIR}/${id}.${ext}`);
+			return { result: true };
+		}
+	},
+
+	captureList: {
+		call: function() {
+			const list = [];
+			for (let f in lsdir(CAP_DIR) || []) {
+				const m = match(f, /^(.+)\.json$/);
+				const info = m && match(m[1], CAP_ID_RE) ? cap_info(m[1]) : null;
+				if (info)
+					push(list, info);
+			}
+			return { captures: sort(list, (a, b) => b.started - a.started) };
+		}
+	},
+
+	// 从 offset 开始读取逐包解析文本，只返回完整的行；页面用返回的 offset 继续轮询
+	captureTail: {
+		args: { id: 'id', offset: 0, max: 32768 },
+		call: function(req) {
+			const id = req.args.id || '';
+			if (!match(id, CAP_ID_RE))
+				return { error: 'invalid id' };
+
+			const info = cap_info(id);
+			if (!info)
+				return { error: 'capture not found' };
+
+			let offset = int(req.args.offset ?? 0);
+			let max = int(req.args.max ?? 32768);
+			if (offset < 0 || offset > info.txt_size)
+				offset = 0;
+			if (max <= 0 || max > TAIL_MAX_BYTES)
+				max = TAIL_MAX_BYTES;
+
+			let data = '';
+			const f = (offset < info.txt_size) ? open(`${CAP_DIR}/${id}.txt`, 'r') : null;
+			if (f) {
+				f.seek(offset);
+				data = f.read(max) || '';
+				f.close();
+
+				// tcpdump 可能正写到半行，留到下次再读
+				const nl = rindex(data, '\n');
+				data = (nl >= 0) ? substr(data, 0, nl + 1) : '';
+			}
+
+			return {
+				offset: offset + length(data),
+				data: data,
+				more: offset + length(data) < info.txt_size,
+				running: info.running,
+				size: info.size,
+				txt_size: info.txt_size,
+				error: info.error
+			};
+		}
+	},
+
+	capturePreview: {
+		args: { id: 'id', count: 200 },
+		call: function(req) {
+			const id = req.args.id || '';
+			if (!match(id, CAP_ID_RE))
+				return { error: 'invalid id' };
+
+			let count = int(req.args.count ?? 200);
+			if (count <= 0 || count > 2000)
+				count = 200;
+
+			const file = `${CAP_DIR}/${id}.pcap`;
+			if (!access(file))
+				return { error: 'capture file not found' };
+
+			const bin = tcpdump_bin();
+			if (!bin)
+				return { error: 'tcpdump is not installed' };
+
+			const out = run(`${bin} -nn -e -tttt -r ${shellquote(file)} -c ${count} 2>&1 | head -c ${PREVIEW_MAX_BYTES}`);
+			return { output: out || '' };
+		}
+	}
+};
+
+return { 'luci.devmon': methods };

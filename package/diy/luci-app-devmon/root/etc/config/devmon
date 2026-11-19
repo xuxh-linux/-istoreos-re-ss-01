@@ -1,0 +1,13 @@
+
+config devmon 'main'
+	option enabled '1'
+	option iface 'br-lan'
+	option interval '2'
+	option history '150'
+	option cap_max_mb '64'
+
+# Per-device settings are written by the web UI, e.g.
+# config device 'aabbccddeeff'
+#	option mac 'aa:bb:cc:dd:ee:ff'
+#	option name 'Living room TV'
+#	option blocked '0'

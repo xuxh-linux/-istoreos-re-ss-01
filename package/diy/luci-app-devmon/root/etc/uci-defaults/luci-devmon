@@ -1,0 +1,8 @@
+#!/bin/sh
+
+rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/*
+/etc/init.d/rpcd reload
+/etc/init.d/devmon enable
+/etc/init.d/devmon start
+
+exit 0

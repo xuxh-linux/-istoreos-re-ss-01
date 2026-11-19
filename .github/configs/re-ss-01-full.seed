@@ -1,0 +1,256 @@
+# 京东云亚瑟 AX1800 Pro（RE-SS-01）完整版种子配置
+#
+# iStoreOS 的「完全体界面」本体是 luci-app-quickstart（首页 + 网络向导），
+# 而 luci-app-quickstart 的 LUCI_DEPENDS 是 "+quickstart +luci-app-store"。
+# quickstart 二进制本身又依赖一长串工具包（shadow-* / smartmontools /
+# parted / mdadm / ip-full / bash ...）。
+# OpenWrt 的 defconfig 对「依赖不满足」的包是**【静默丢弃】**——
+# 不报错、不提示，直接把符号从 .config 里抹掉。只要链上任一环缺失，
+# 整个 quickstart 界面就会消失（这正是上一版固件没有首页的原因）。
+# 因此这里把整条依赖链逐项显式列出，并在后面用独立的校验步骤卡住。
+#
+# 用法：cp .github/configs/re-ss-01-full.seed .config && make defconfig
+
+CONFIG_TARGET_qualcommax=y
+CONFIG_TARGET_qualcommax_ipq60xx=y
+CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_jdcloud_re-ss-01=y
+CONFIG_TARGET_ROOTFS_SQUASHFS=y
+# initramfs 镜像会把整个 rootfs 打进内存（约 200MB），512MB 机型
+# 无法 TFTP 启动，只会拖慢编译、占用 Release 空间
+# CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+# 小内存机型用 zram 做压缩交换，降低 OOM 概率
+CONFIG_PACKAGE_zram-swap=y
+# zram 默认只编 lzo 后端；加 zstd（压缩率高得多）并设为默认，
+# 保留 lzo 兼容旧配置里的 zram_comp_algo='lzo'
+CONFIG_KERNEL_ZRAM_BACKEND_LZO=y
+CONFIG_KERNEL_ZRAM_BACKEND_ZSTD=y
+CONFIG_KERNEL_ZRAM_DEF_COMP_ZSTD=y
+CONFIG_KERNEL_BUILD_USER="natserver"
+CONFIG_KERNEL_BUILD_DOMAIN="istoreos"
+
+# ===============================================================
+# A. iStoreOS 完整版界面栈（首页 / 网络向导 / 应用商店）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-store=y
+CONFIG_PACKAGE_quickstart=y
+CONFIG_PACKAGE_luci-app-quickstart=y
+CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y
+CONFIG_PACKAGE_taskd=y
+CONFIG_PACKAGE_luci-lib-taskd=y
+CONFIG_PACKAGE_luci-lib-xterm=y
+
+# A2. quickstart 的硬依赖（缺一个 → 整条链被 defconfig 丢弃）
+CONFIG_PACKAGE_shadow-utils=y
+CONFIG_PACKAGE_shadow-useradd=y
+CONFIG_PACKAGE_mount-utils=y
+CONFIG_PACKAGE_block-mount=y
+CONFIG_PACKAGE_lsblk=y
+CONFIG_PACKAGE_e2fsprogs=y
+CONFIG_PACKAGE_parted=y
+CONFIG_PACKAGE_smartmontools=y
+CONFIG_PACKAGE_smartd=y
+CONFIG_PACKAGE_smartmontools-drivedb=y
+CONFIG_PACKAGE_mdadm=y
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_bash=y
+
+# ===============================================================
+# B. iStoreOS 外观（argon 主题 + 图标字体）
+# ===============================================================
+CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_luci-app-argon-config=y
+
+# ===============================================================
+# C. 基础 LuCI
+# ===============================================================
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-app-package-manager=y
+CONFIG_PACKAGE_luci-compat=y
+# 注意：**不要** 选 luci-mod-dashboard。
+# 它的 menu.d/luci-mod-dashboard.json 会注册一个 admin/dashboard 顶层项，
+# 中文 po 把 "Dashboard" 译作「主页」——于是左侧菜单会多出一个「主页」，
+# 和 quickstart 的「首页」并排、重复且点击无内容。
+# 官方 iStoreOS 25.12.5 的 /usr/share/luci/menu.d 里根本没有
+# luci-mod-dashboard.json，即官方就不装这个包。
+
+# 终端（截图中「服务 > 终端」）
+CONFIG_PACKAGE_ttyd=y
+CONFIG_PACKAGE_luci-app-ttyd=y
+
+# ===============================================================
+# D. 存储与文件系统（把 2GB 大分区用起来）
+# ===============================================================
+CONFIG_PACKAGE_blkid=y
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_usb-storage-utils=y
+CONFIG_PACKAGE_kmod-fs-vfat=y
+CONFIG_PACKAGE_kmod-fs-exfat=y
+CONFIG_PACKAGE_kmod-fs-f2fs=y
+CONFIG_PACKAGE_kmod-fs-ext4=y
+CONFIG_PACKAGE_kmod-fs-ntfs3=y
+CONFIG_PACKAGE_mkf2fs=y
+CONFIG_PACKAGE_f2fsck=y
+CONFIG_PACKAGE_ntfs3-mount=y
+CONFIG_PACKAGE_luci-app-hd-idle=y
+
+# ===============================================================
+# E. 存储服务（截图中「存储服务」区块）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-samba4=y
+CONFIG_PACKAGE_samba4-server=y
+CONFIG_PACKAGE_samba4-libs=y
+CONFIG_PACKAGE_webdavfs=y
+CONFIG_PACKAGE_luci-app-nfs=y
+CONFIG_PACKAGE_luci-app-cifs-mount=y
+CONFIG_PACKAGE_luci-app-minidlna=y
+CONFIG_PACKAGE_minidlna=y
+
+# ===============================================================
+# F. 服务菜单（截图里点开「服务」应有的常用项）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-wol=y
+CONFIG_PACKAGE_luci-app-upnp=y
+CONFIG_PACKAGE_luci-app-ddns=y
+CONFIG_PACKAGE_luci-app-filetransfer=y
+CONFIG_PACKAGE_luci-lib-fs=y
+CONFIG_PACKAGE_luci-app-tn-netports=y
+
+# ===============================================================
+# G. 常用命令行工具（quickstart / 运维都要用）
+# ===============================================================
+CONFIG_PACKAGE_curl=y
+CONFIG_PACKAGE_tar=y
+CONFIG_PACKAGE_gzip=y
+CONFIG_PACKAGE_xz-utils=y
+CONFIG_PACKAGE_unzip=y
+CONFIG_PACKAGE_ca-bundle=y
+
+# ===============================================================
+# H. 中文语言包（界面汉化）
+# ===============================================================
+CONFIG_LUCI_LANG_zh_Hans=y
+CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-samba4-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-ddns-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-wol-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-minidlna-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
+
+# ===============================================================
+# I. dae/daed（eBPF 透明代理）底层支持
+# daed 本体与 luci-app-daed 不编入固件（用户选择刷机后自装），
+# 这里只保证内核 BTF / XDP / BPF 与运行时依赖就位。
+# ===============================================================
+CONFIG_DEVEL=y
+CONFIG_BPF_TOOLCHAIN_HOST=y
+CONFIG_KERNEL_DEBUG_INFO=y
+# BTF 依赖 !KERNEL_DEBUG_INFO_REDUCED，而 REDUCED 默认是 y，
+# 不显式关掉的话 defconfig 会把 BTF 静默丢弃，daed 无法加载
+# CONFIG_KERNEL_DEBUG_INFO_REDUCED is not set
+CONFIG_KERNEL_DEBUG_INFO_BTF=y
+CONFIG_KERNEL_CGROUPS=y
+CONFIG_KERNEL_CGROUP_BPF=y
+CONFIG_KERNEL_BPF_EVENTS=y
+CONFIG_KERNEL_XDP_SOCKETS=y
+CONFIG_PACKAGE_kmod-xdp-sockets-diag=y
+CONFIG_PACKAGE_kmod-sched-core=y
+CONFIG_PACKAGE_kmod-sched-bpf=y
+CONFIG_PACKAGE_kmod-veth=y
+CONFIG_PACKAGE_kmod-dummy=y
+CONFIG_PACKAGE_v2ray-geoip=y
+CONFIG_PACKAGE_v2ray-geosite=y
+CONFIG_PACKAGE_zoneinfo-asia=y
+
+# ===============================================================
+# J. TUN/TAP 虚拟网卡（TUN 模式代理的前置）
+# Tailscale / sing-box(tun) / OpenClash / passwall 等都要先有 /dev/net/tun。
+# 本包把 tun 编成模块 tun.ko 放进 rootfs（安装后约 80 KB，占 2 GB 分区
+# 约 0.004%），**不进 12 MiB 内核分区**，因此内核镜像体积不变。
+# 注意：外部预编译的 kmod 一律不可用（内核哈希必须与本固件一致），
+# 所以只能像这样编进固件，没有「下载安装包单独装」这条路。
+# ===============================================================
+CONFIG_PACKAGE_kmod-tun=y
+
+# ===============================================================
+# K. 预装应用（与本地 .config 保持一致，刷机即用，无需另装）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-passwall=y
+CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
+CONFIG_PACKAGE_luci-app-homeproxy=y
+CONFIG_PACKAGE_luci-i18n-homeproxy-zh-cn=y
+CONFIG_PACKAGE_dae=y
+CONFIG_PACKAGE_daed=y
+CONFIG_PACKAGE_luci-app-daede=y
+CONFIG_DAE_USE_KERNEL_BTF=y
+CONFIG_DAED_USE_KERNEL_BTF=y
+CONFIG_PACKAGE_mosdns=y
+CONFIG_PACKAGE_luci-app-mosdns=y
+CONFIG_PACKAGE_luci-i18n-mosdns-zh-cn=y
+
+# ===============================================================
+# L. 无线：完整版 wpad（802.11k/v）+ usteer 双频引导 + 中继
+# ===============================================================
+# CONFIG_PACKAGE_wpad-basic-mbedtls is not set
+CONFIG_PACKAGE_wpad-mbedtls=y
+CONFIG_PACKAGE_usteer=y
+CONFIG_PACKAGE_luci-app-usteer=y
+CONFIG_PACKAGE_luci-i18n-usteer-zh-cn=y
+CONFIG_PACKAGE_relayd=y
+CONFIG_PACKAGE_luci-proto-relay=y
+
+# ===============================================================
+# M. 4G USB 网卡 / 模块 / 手机 USB 共享
+# ===============================================================
+# kmod 源对自编内核不可用（404），驱动必须编进固件。
+# 插上后由 hotplug.d/net/30-re-ss-01-usbwan（DHCP 类）和
+# hotplug.d/usbmisc/30-re-ss-01-modem（QMI/MBIM → ModemManager）自动建接口。
+# 串口：大多数模块的 AT / 诊断口
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+CONFIG_PACKAGE_kmod-usb-serial-qualcomm=y
+CONFIG_PACKAGE_kmod-usb-acm=y
+# 网卡：QMI / MBIM / ECM / NCM / 华为 NCM / RNDIS / iPhone
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+CONFIG_PACKAGE_kmod-usb-net-huawei-cdc-ncm=y
+CONFIG_PACKAGE_kmod-usb-net-rndis=y
+CONFIG_PACKAGE_kmod-usb-net-ipheth=y
+CONFIG_PACKAGE_usbmuxd=y
+# 很多上网卡插上先是光驱，要切换到网卡模式
+CONFIG_PACKAGE_usb-modeswitch=y
+# 拨号：ModemManager（自动配置用它）+ 各协议的手动拨号
+CONFIG_PACKAGE_modemmanager=y
+CONFIG_PACKAGE_luci-proto-modemmanager=y
+CONFIG_PACKAGE_uqmi=y
+CONFIG_PACKAGE_luci-proto-qmi=y
+CONFIG_PACKAGE_umbim=y
+CONFIG_PACKAGE_luci-proto-mbim=y
+CONFIG_PACKAGE_comgt=y
+CONFIG_PACKAGE_comgt-ncm=y
+CONFIG_PACKAGE_luci-proto-3g=y
+CONFIG_PACKAGE_luci-proto-ncm=y
+
+# ===============================================================
+# N. 卡死诊断：锁死检测 + ramoops
+# 锁死后 panic 重启（sysctl 见 base-files 的 20-lockup-panic.conf），
+# ramoops 把重启前的内核日志留在内存里（DTS 的 ramoops@50000000），
+# 热重启后在 /sys/fs/pstore 读取
+# 硬锁死检测在本机自动选 buddy 实现（GIC 没有伪 NMI，perf 实现用不了）
+# 这几项都依赖 KERNEL_DEBUG_KERNEL，由上面的 KERNEL_DEBUG_INFO 选上
+# ===============================================================
+CONFIG_KERNEL_SOFTLOCKUP_DETECTOR=y
+CONFIG_KERNEL_HARDLOCKUP_DETECTOR=y
+CONFIG_KERNEL_DETECT_HUNG_TASK=y
+CONFIG_PACKAGE_kmod-ramoops=y
+
+# ===============================================================
+# O. 设备管理 / 流量监控 / 抓包（自研 luci-app-devmon，依赖 tcpdump）
+# ===============================================================
+CONFIG_PACKAGE_luci-app-devmon=y
+CONFIG_PACKAGE_tcpdump=y

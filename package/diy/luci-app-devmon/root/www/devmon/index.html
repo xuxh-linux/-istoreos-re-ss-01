@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>DevMon 设备监控</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23c4b3ff'/%3E%3Cpath d='M3 12h4l3-8 4 16 3-8h4' fill='none' stroke='%231a1530' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="bg-blobs"><i></i><i></i><i></i></div>
+
+<section id="login" class="login hidden">
+	<form class="login-card" id="login-form" autocomplete="on">
+		<div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1530" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+		<h1 class="grad-text">DevMon</h1>
+		<p class="muted">设备管理 · 流量监控 · 数据包抓取</p>
+		<input type="text" name="username" id="login-user" value="root" autocomplete="username" placeholder="用户名">
+		<input type="password" name="password" id="login-pass" autocomplete="current-password" placeholder="路由器登录密码" autofocus>
+		<button class="btn" type="submit">登 录</button>
+		<div class="login-err" id="login-err"></div>
+	</form>
+</section>
+
+<div id="app" class="app hidden">
+	<header class="topbar">
+		<div class="brand">
+			<div class="logo sm"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1530" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+			<div>
+				<h1 class="grad-text">DevMon</h1>
+				<small id="host-name">设备监控中心</small>
+			</div>
+		</div>
+		<div class="status-pills">
+			<span class="pill"><span class="dot" id="svc-dot"></span><span id="svc-text">连接中</span></span>
+			<span class="pill">在线 <b id="pill-online">-</b></span>
+			<span class="pill"><span style="color:var(--up)">↑</span> <b id="pill-up">-</b></span>
+			<span class="pill"><span style="color:var(--down)">↓</span> <b id="pill-down">-</b></span>
+		</div>
+		<button class="btn ghost sm" id="btn-logout">退出</button>
+	</header>
+
+	<nav class="tabs" id="tabs">
+		<button data-tab="overview" class="on">✦ 总览</button>
+		<button data-tab="devices">◉ 设备管理</button>
+		<button data-tab="capture">◈ 数据包抓取</button>
+		<button data-tab="settings">⚙ 设置</button>
+	</nav>
+
+	<div id="banner"></div>
+
+	<!-- 总览 -->
+	<section data-page="overview">
+		<div class="grid stats">
+			<div class="card stat" style="--c:var(--mint)">
+				<div class="label"><span class="icon">◉</span>在线设备</div>
+				<div class="value" id="st-online">-</div>
+				<div class="sub" id="st-online-sub">-</div>
+			</div>
+			<div class="card stat" style="--c:var(--sky)">
+				<div class="label"><span class="icon">↑</span>实时上传</div>
+				<div class="value" id="st-up">-</div>
+				<div class="sub" id="st-up-sub">峰值 -</div>
+			</div>
+			<div class="card stat" style="--c:var(--pink)">
+				<div class="label"><span class="icon">↓</span>实时下载</div>
+				<div class="value" id="st-down">-</div>
+				<div class="sub" id="st-down-sub">峰值 -</div>
+			</div>
+			<div class="card stat" style="--c:var(--lavender)">
+				<div class="label"><span class="icon">Σ</span>累计流量</div>
+				<div class="value" id="st-total">-</div>
+				<div class="sub" id="st-total-sub">-</div>
+			</div>
+		</div>
+		<div class="grid two">
+			<div class="card">
+				<h2><span class="bar" style="background:linear-gradient(var(--sky),var(--pink))"></span>实时总流量
+					<span class="right"><select id="ov-dev" style="padding:5px 10px;font-size:13px"></select></span></h2>
+				<div class="legend" id="ov-legend"></div>
+				<div class="chart-wrap" id="ov-chart"></div>
+			</div>
+			<div class="card">
+				<h2><span class="bar" style="background:linear-gradient(var(--mint),var(--lavender))"></span>实时速率排行</h2>
+				<div class="rank" id="ov-rank"></div>
+			</div>
+		</div>
+	</section>
+
+	<!-- 设备 -->
+	<section data-page="devices" class="hidden">
+		<div class="toolbar">
+			<input type="search" id="dev-search" placeholder="搜索名称 / IP / MAC">
+			<span class="chip on" data-c="lavender" data-f="all">全部</span>
+			<span class="chip" data-c="mint" data-f="online">在线</span>
+			<span class="chip" data-c="pink" data-f="blocked">已拉黑</span>
+			<select id="dev-sort" style="margin-left:auto">
+				<option value="rate">按实时速率</option>
+				<option value="total">按累计流量</option>
+				<option value="name">按名称</option>
+			</select>
+		</div>
+		<div class="dev-grid" id="dev-grid"></div>
+	</section>
+
+	<!-- 抓包 -->
+	<section data-page="capture" class="hidden">
+		<div class="grid cap">
+			<div class="grid" style="gap:16px">
+				<div class="card">
+					<h2><span class="bar" style="background:linear-gradient(var(--pink),var(--peach))"></span>新建抓包</h2>
+					<div id="cap-warn"></div>
+					<div class="form-row">
+						<label>目标设备</label>
+						<select id="cap-dev"></select>
+					</div>
+					<div class="form-row">
+						<label>网络接口</label>
+						<select id="cap-iface"></select>
+						<span class="hint">通常选 LAN 网桥 br-lan，无线客户端的流量也经过它</span>
+					</div>
+					<div class="form-row">
+						<label>附加过滤 (BPF，可选)</label>
+						<input type="text" id="cap-filter" maxlength="256" placeholder="如 tcp port 443 或 udp port 53">
+						<span class="hint">与设备 MAC 用 and 组合；抓到后还能在右侧实时筛选</span>
+					</div>
+					<div class="form-row inline">
+						<div><label>大小上限 MB</label><input type="number" id="cap-size" value="16" min="1" max="1024"></div>
+						<div><label>时长上限 秒</label><input type="number" id="cap-dur" value="60" min="0" max="86400"></div>
+					</div>
+					<button class="btn pink" id="cap-start" style="width:100%">▶ 开始抓包</button>
+					<div class="msg" id="cap-msg"></div>
+				</div>
+				<div class="card">
+					<h2><span class="bar" style="background:linear-gradient(var(--lavender),var(--sky))"></span>抓包记录
+						<span class="right dim" style="font-size:12px">保存在内存，重启后清空</span></h2>
+					<div class="cap-list" id="cap-list"></div>
+				</div>
+			</div>
+			<div class="card">
+				<h2><span class="bar" style="background:linear-gradient(var(--mint),var(--sky))"></span>实时预览
+					<span class="right muted" id="live-title" style="font-size:13px">未选择抓包</span></h2>
+				<div class="metrics">
+					<div class="metric"><div class="k">状态</div><div class="v" id="m-state">-</div></div>
+					<div class="metric"><div class="k">时长</div><div class="v" id="m-time">-</div></div>
+					<div class="metric"><div class="k">数据包</div><div class="v" id="m-pkts">-</div></div>
+					<div class="metric"><div class="k">包速率</div><div class="v" id="m-pps">-</div></div>
+					<div class="metric"><div class="k">pcap 大小</div><div class="v" id="m-size">-</div></div>
+					<div class="metric"><div class="k">筛选命中</div><div class="v" id="m-hit">-</div></div>
+				</div>
+				<div class="console-bar">
+					<input type="search" id="live-q" placeholder="筛选日志：关键字空格分隔，!排除，如 443 !ack">
+					<span class="chip" data-c="lemon" id="live-regex" title="把输入当作正则表达式">.* 正则</span>
+				</div>
+				<div class="console-bar" id="live-protos">
+					<span class="chip on" data-c="mint" data-p="tcp">TCP</span>
+					<span class="chip on" data-c="lavender" data-p="udp">UDP</span>
+					<span class="chip on" data-c="sky" data-p="dns">DNS</span>
+					<span class="chip on" data-c="peach" data-p="icmp">ICMP</span>
+					<span class="chip on" data-c="lemon" data-p="arp">ARP</span>
+					<span class="chip on" data-c="pink" data-p="oth">其他</span>
+					<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+						<button class="btn ghost xs" id="live-follow">⇩ 自动滚动</button>
+						<button class="btn ghost xs" id="live-pause">❚❚ 暂停</button>
+						<button class="btn ghost xs" id="live-clear">清屏</button>
+						<button class="btn ghost xs" id="live-save" title="把当前筛选结果保存为文本">保存筛选结果</button>
+					</span>
+				</div>
+				<div class="console" id="console"><div class="empty">点击左侧“开始抓包”，或在抓包记录里点“查看”</div></div>
+				<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+					<button class="btn danger sm hidden" id="live-stop">■ 停止抓包</button>
+					<button class="btn mint sm" id="live-dl-pcap" disabled>下载 pcap (Wireshark)</button>
+					<button class="btn ghost sm" id="live-dl-txt" disabled>下载完整日志 txt</button>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- 设置 -->
+	<section data-page="settings" class="hidden">
+		<div class="card" style="max-width:640px">
+			<h2><span class="bar" style="background:linear-gradient(var(--lavender),var(--pink))"></span>服务设置</h2>
+			<div class="form-row inline" style="align-items:center">
+				<div><label>启用服务</label><span class="hint">关闭后流量统计和设备拉黑都会停止</span></div>
+				<label class="switch"><input type="checkbox" id="set-enabled"><span></span></label>
+			</div>
+			<div class="form-row">
+				<label>LAN 接口</label>
+				<select id="set-iface"></select>
+			</div>
+			<div class="form-row inline">
+				<div><label>采样间隔</label>
+					<select id="set-interval"><option value="1">1 秒</option><option value="2">2 秒</option><option value="5">5 秒</option><option value="10">10 秒</option></select></div>
+				<div><label>曲线保留点数</label><input type="number" id="set-history" min="10" max="1800"></div>
+			</div>
+			<div class="form-row">
+				<label>单个抓包文件上限 (MB)</label>
+				<input type="number" id="set-capmax" min="1" max="1024">
+				<span class="hint">抓包文件保存在内存 /tmp 中，同时不超过剩余空间的一半</span>
+			</div>
+			<button class="btn" id="set-save">保存设置</button>
+			<div class="msg" id="set-msg"></div>
+		</div>
+	</section>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>
